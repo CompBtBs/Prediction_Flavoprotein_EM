@@ -1,5 +1,3 @@
 # Prediction_Flavoprotein_EM
 
-.. raw:: html
-
-    <img src="intro_paper.png" height="300x">
+![intro_paper](https://user-images.githubusercontent.com/61013653/160860307-e7d8d9bb-0087-4211-86b9-be2bd0a24e79.png)
