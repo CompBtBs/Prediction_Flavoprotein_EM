@@ -2,4 +2,4 @@
 
 .. raw:: html
 
-    <img src="pipeline.png" height="300x">
+    <img src="intro_paper.png" height="300x">
