@@ -36,9 +36,7 @@ warnings.filterwarnings('ignore')
 
 # In[5]:
 
-path_dir1="G:/Altri computer/Computer_Laboratorio/"
-#path_dir1="C:/Users/AM866527/Desktop/"
-
+path_dir1="dataset_features/"
 
 # In[ciclo_per_più_dataset]:
 
@@ -115,7 +113,7 @@ for NNB_radius in list_NNB_radius:
             
             # Upload dataset
             #file_name="database_chains_8_4.xlsx"
-            df_pm=pd.read_excel(path_dir1+"AntonioM/Dataset_finali/"+file_name,sheet_name="Sheet1",index_col=0)
+            df_pm=pd.read_excel(path_dir1+file_name,sheet_name="Sheet1",index_col=0)
             df_pm=df_pm.reset_index()
             df_pm=df_pm.iloc[:,1:]
             if "Protein_name" in df_pm.columns:
