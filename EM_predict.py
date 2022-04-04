@@ -11,7 +11,6 @@ Created on Tue Mar 29 14:18:52 2022
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-import scanpy as sc
 import sys
 from sklearn.metrics import *
 from sklearn.model_selection import *
@@ -25,7 +24,6 @@ from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.ensemble import RandomForestRegressor
 from xgboost import XGBRegressor
 from sklearn.pipeline import Pipeline
-from skopt.space import Real, Categorical, Integer
 from sklearn.linear_model import ElasticNetCV,LassoCV
 from sklearn.model_selection import GridSearchCV
 from sklearn.gaussian_process.kernels import RBF,ConstantKernel
