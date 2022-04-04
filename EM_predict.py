@@ -87,9 +87,9 @@ models_dict={"LR":[LinearRegression(),{}],
                     }],
              "XGB":[XGBRegressor(),
                     {
-                    #"regressor__learning_rate" : [0.01,0.1,0.2,0.4],
+                    "regressor__learning_rate" : [0.01,0.1,0.2,0.4],
                     "regressor__max_depth" : [3,4,5],
-                    #"regressor__min_child_weight" : [1,5,10],
+                    "regressor__min_child_weight" : [1,5,10],
                     "regressor__n_estimators" : [100,150,200]
                     }]
              } 
@@ -266,19 +266,19 @@ for NNB_radius in list_NNB_radius:
                                                                 ]
                 model_line+=1
                 
-                a=models_scan["MAE_lists"].iloc[0]
-                b=models_scan["MAE_conts"].iloc[0]
-                a1=[a[key] for key in a.keys()]
-                b1=[b[key] for key in b.keys()]
-                plt.figure()
-                plt.scatter(a1,b1)
+            a=models_scan["MAE_lists"].iloc[index_line]
+            b=models_scan["MAE_conts"].iloc[index_line]
+            a1=[a[key] for key in a.keys()]
+            b1=[b[key] for key in b.keys()]
+            plt.figure()
+            plt.scatter(a1,b1)
             
             executionTime = (time.time () - startTime) 
             print ('Execution time in seconds: ' + str (executionTime)) 
             
             models_scan.to_excel(path_dir_output+file_input_name+".xlsx")  
         
-            index_line+=6 
+            index_line+=len(name_models)
             
                         
 
