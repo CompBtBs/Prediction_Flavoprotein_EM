@@ -54,8 +54,8 @@ models_scan=pd.DataFrame(columns=["name_model_radius",
                                   ])
 
 alpha=10                    #alpha paramter for feature selection
-list_NNB_radius=np.arange(8,9)     
-list_N5_radius=np.arange(3,4)
+list_NNB_radius=np.arange(8,17)     
+list_N5_radius=np.arange(3,6)
 CV=5 #cross validation for hyperparameters tuning
 opt="neg_mean_absolute_error" #evaluation metric for hyperparameters tuning
 split_tuning=5                #number of split for hyperparameters tuning (quindi 80 e 20)
@@ -90,9 +90,9 @@ models_dict={"LR":[LinearRegression(),{}],
                     }],
              "XGB":[XGBRegressor(),
                     {
-                    #"regressor__regressor__learning_rate" : [0.01,0.1,0.2,0.4],
-                    "regressor__regressor__max_depth" : [3],
-                    #"regressor__regressor__min_child_weight" : [1,5,10],
+                    "regressor__regressor__learning_rate" : [0.01,0.1,0.2,0.4],
+                    "regressor__regressor__max_depth" : [3,4,5],
+                    "regressor__regressor__min_child_weight" : [1,5,10],
                     "regressor__regressor__n_estimators" : [100,150,200]
                     }]
              } 
@@ -101,12 +101,11 @@ models_dict={"LR":[LinearRegression(),{}],
 dict_proteins=dict()
 
 #add dict for selector in gridsearch
-for estimator in models_dict.keys():
-    if  estimator in ["LR"]: 
-       models_dict[estimator][1]["regressor__selector__estimator__alpha"]=[10,100]    
-       models_dict[estimator][1]["regressor__selector__estimator__l1_ratio"]=[0.5,0.75,1]
+for estimator in ["LR","KNR","SVR","GPR"]:
+    #models_dict[estimator][1]["regressor__selector__estimator__alpha"]=[10,100]    
+    models_dict[estimator][1]["regressor__selector__estimator__l1_ratio"]=[0.5,0.75,1]
 
-name_models=["LR","KNR","SVR","GPR","XGB"]#,"KNR","GPR"]
+name_models=["LR","KNR","GPR","SVR","RF","XGB"]
 
 df_protein_organism=pd.read_csv("organism.csv",index_col=0)
 
@@ -127,6 +126,7 @@ for NNB_radius in list_NNB_radius:
             #file_name="database_chains_8_4.xlsx"
             df_pm=pd.read_excel(path_inputs+file_name,sheet_name="Sheet1",index_col=0)
             df_pm=df_pm.drop_duplicates()
+            #df_pm=df_pm.loc[[el for el in df_pm.index if el!="1M6I"]]
             for estimator in name_models:
                 dict_proteins[estimator]=dict()
                 dict_proteins_cont[estimator]=dict()
@@ -195,13 +195,15 @@ for NNB_radius in list_NNB_radius:
                         if estimator in ["LR","SVR","GPR","KNR"]:
                             #lo scaling si fai solo per LR,SVR e GPR
                             pipeline.append(('scaler', StandardScaler()))
-                        if  estimator in ["LR"]: 
+                        if  estimator in ["LR","SVR","KNR","GPR"]: 
                             #selziono le feature solo per LR,GPR e SVR
                             pipeline.append(('selector', SelectFromModel(estimator=estimator_feature)))
                             
                         pipeline.append(('regressor', models_dict[estimator][0]))
                         pipe=Pipeline(pipeline)
-                        treg=TransformedTargetRegressor(regressor=pipe,transformer=None)
+                        
+                        treg=TransformedTargetRegressor(regressor=pipe,transformer=None) #trasforma eventualmente la variabile y
+                        
                         optEstimator = GridSearchCV(treg, models_dict[estimator][1],
                                                     scoring=opt,cv=CV,
                                                     n_jobs=n_jobs
@@ -233,6 +235,7 @@ for NNB_radius in list_NNB_radius:
                         
                         df_proteins[estimator]=[dict_proteins[estimator][key] for key in dict_proteins[estimator].keys()]
                 df_proteins["organism"]=df_protein_organism["organism"]
+                #df_proteins=df_proteins.loc[[el for el in df_proteins.index if el!="1M6I"]]
                 model_line=0
                 for estimator in name_models:
     
@@ -289,14 +292,14 @@ for NNB_radius in list_NNB_radius:
                                                                     #len(selected_features)
                                                                     ]
                     model_line+=1
-                
+                    
 
             
             executionTime = (time.time () - startTime) 
             print ('Execution time in seconds: ' + str (executionTime)) 
             
             models_scan.to_excel(path_dir_output+file_input_name+".xlsx")  
-        
+            df_proteins.to_csv(path_dir_output+"analysis_proteins_NNB_"+str(NNB_radius)+"_N5_"+str(N5_radius)+".csv")
             index_line+=len(name_models)
             
                         
