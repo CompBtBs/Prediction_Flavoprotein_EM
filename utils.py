@@ -9,9 +9,37 @@ Funzioni utilizzate nel main
 """
 
 
-
+from sklearn.pipeline import Pipeline, TransformerMixin
 import numpy as np
 from numpy.linalg import norm as norm2
+from sklearn.ensemble import IsolationForest
+
+def RemoveOutliar(X,y):
+    clf = IsolationForest(random_state=0).fit(X)
+    X_=X.copy()
+    y_=y.copy()
+    X_=X_[clf.predict(X)==1,:] 
+    y_=y_[clf.predict(X)==1]
+    return X_,y_
+
+class RHCF():
+    def __init__(self,covariation=0.99):
+        self.covariation=0.99
+        pass
+
+
+    def fit(self, X,y=None):
+        Df_corr=np.abs(np.corrcoef(np.transpose(X)))
+        upper_tri = np.triu(Df_corr,k=1)
+        to_drop= [ i for i in range(X.shape[1]) if any(upper_tri[:,i] >= self.covariation)]
+        self.to_keep=[i for i in range(X.shape[1]) if i not in to_drop]
+        return self
+
+    def transform(self, X,y=None):
+        X_=X.copy()
+        return X_[:,self.to_keep]
+
+
 #%% funzione per prelevare il baricentro di una struttura
 def get_baricentro(element,el1,el2):
     if el2!=-1:
