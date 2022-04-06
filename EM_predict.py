@@ -27,7 +27,6 @@ from sklearn.ensemble import IsolationForest
 from sklearn.compose import TransformedTargetRegressor
 from sklearn import feature_selection
 from sklearn.impute import SimpleImputer
-from sklearn.impute import IterativeImputer
 from xgboost import XGBRegressor
 import warnings
 import time
@@ -37,26 +36,26 @@ from utils import RHCF,feature_selected
 warnings.filterwarnings('ignore')
 
 # In[5]: scelta dei modelli
-name_models=["KNR"]
-models_with_scaling=["KNR"]              #modelli a cui applicare lo scaling
-models_with_fs=["KNR"]                   #modelli a cui applicare la feature selection
+name_models=["LR","KNR","SVR","GPR","RF","XGB"]
+models_with_scaling=["LR","KNR","SVR","GPR"]              #modelli a cui applicare lo scaling
+models_with_fs=["LR","KNR","SVR","GPR"]                   #modelli a cui applicare la feature selection
 select_features=[]#feature_selected()
 
 ############
 n_jobs=4                      #number of processes in parallel
 path_inputs="dataset_features/"
 path_dir_output="outputs/"
-file_input_name ="proteins" #or proteins 
-list_NNB_radius=np.arange(8,17)     
-list_N5_radius=np.arange(3,6)
+file_input_name ="protein" #or proteins 
+list_NNB_radius=np.arange(8,9)     
+list_N5_radius=np.arange(3,4)
 ###parameters
-CV=5                            #cross validation for hyperparameters tuning
-split_tuning=5                  #number of split for hyperparameters tuning (quindi 80 e 20)
 n_repeat=5                      #ripetizioni dell'esperimento
+split_tuning=5                  #number of split for hyperparameters tuning (quindi 80 e 20)
+CV=5                            #cross validation for hyperparameters tuning
 opt="neg_mean_absolute_error"   #evaluation metric for hyperparameters tuning
-covariation=0.99
+covariation=0.99                #valore della correlazione
 alpha=10                        #alpha paramter for feature selection
-l1_ratio=1
+l1_ratio=1                      #
 
 ###############################################################################################
 # INIZIALIZZO LE STRUTTE DATI
@@ -113,8 +112,8 @@ df_protein_organism=pd.read_csv("organism.csv",index_col=0)
 
 # In[]:
 #inizializzo i selettori
-anova = feature_selection.SelectPercentile(f_regression)
-estimator_feature=SelectFromModel(ElasticNet(max_iter=1000,alpha=alpha,l1_ratio=l1_ratio))
+en=ElasticNet(max_iter=1000,alpha=alpha,l1_ratio=l1_ratio)
+estimator_feature=SelectFromModel(en)
 imp = SimpleImputer(missing_values=np.nan,strategy="mean")
 #imp = IterativeImputer(missing_values=np.nan)
 
@@ -125,14 +124,12 @@ for NNB_radius in list_NNB_radius:
             dict_proteins=dict()
             dict_proteins_cont=dict()
 #%%
-            file_name="dataset_"+file_input_name+"_"+str(NNB_radius)+"_"+str(N5_radius)+".xlsx"
-            print("dataset_"+file_input_name+"_"+str(NNB_radius)+"_"+str(N5_radius))
+            file_name="database_"+file_input_name+"_"+str(NNB_radius)+"_"+str(N5_radius)+".xlsx"
+            print(file_name)
             
             # Upload dataset
-            #file_name="database_chains_8_4.xlsx"
             df_pmOrig=pd.read_excel(path_inputs+file_name,sheet_name="Sheet1",index_col=0)
             df_pm=df_pmOrig.drop_duplicates()
-            df_pm["pH"][df_pm["pH"]==7.2]=np.nan
             columns_to_keep_=[el for el in df_pm.columns if "%" not in el and "_mean" not in el]
             df_pm=df_pm.loc[:,columns_to_keep_]
 
@@ -143,10 +140,8 @@ for NNB_radius in list_NNB_radius:
                     dict_proteins[estimator][key]=0
                     dict_proteins_cont[estimator][key]=0
                     
-            df_pm=df_pm.reset_index()
             df_pm=df_pm.iloc[:,1:]
-            if "Protein_name" in df_pm.columns:
-                df_pm=df_pm.drop(["Protein_name"],axis=1) 
+
             if len(select_features)!=0:
                 df_pm=df_pm.loc[:,select_features]
 
@@ -166,8 +161,7 @@ for NNB_radius in list_NNB_radius:
             DATA_dict={name_model:{"mae_train":[],"mae_test":[],"mae_lists":[],"RMSE":[],"R2":[],"Pearson":[],"Spearman":[],"EOKfold":[]} for name_model in name_models}
 
             startTime = time.time ()
-            #for i in range(split_tuning):
-            #    X_train, X_test, y_train, y_test,labels_train,labels_test= train_test_split(X, y, labels,test_size=test_size,random_state=i)
+            
             i=0
             for j in range(n_repeat):
                 #ripeto la neste n volte ma così facendo tutte le proteine vengono visitate lo stesso numero di volte
@@ -225,9 +219,14 @@ for NNB_radius in list_NNB_radius:
                         DATA_dict[estimator]["EOKfold"].append(np.abs(optEstimator.best_score_))
                         DATA_dict[estimator]["mae_train"].append(mean_absolute_error(optEstimator.predict(X_train2), y_train))
                         DATA_dict[estimator]["mae_test"].append(mean_absolute_error(optEstimator.predict(X_test2), y_test))
+                        DATA_dict[estimator]["mae_lists"]=dict_proteins[estimator]
+                        DATA_dict[estimator]["mae_conts"]=dict_proteins_cont[estimator]
+                        DATA_dict[estimator]["RMSE"].append(np.sqrt(mean_squared_error(optEstimator.predict(X_test2), y_test)))
+                        DATA_dict[estimator]["R2"].append(r2_score(y_test, optEstimator.predict(X_test2)))
+                        DATA_dict[estimator]["Pearson"].append(pearsonr(y_test, optEstimator.predict(X_test2))[0])
+                        DATA_dict[estimator]["Spearman"].append(spearmanr(y_test, optEstimator.predict(X_test2))[0])
                         
                         values=list(np.abs(optEstimator.predict(X_test2)-y_test))
-    
                         for label,value in zip(labels_test,values):
                             dict_proteins[estimator][label]+=value
                             dict_proteins_cont[estimator][label]+=1
@@ -235,21 +234,11 @@ for NNB_radius in list_NNB_radius:
                         for label in labels_test:
                             dict_proteins[estimator][label]=dict_proteins[estimator][label]/dict_proteins_cont[estimator][label]
                         
-                        DATA_dict[estimator]["mae_lists"]=dict_proteins[estimator]
-                        DATA_dict[estimator]["mae_conts"]=dict_proteins_cont[estimator]
-                        
-                        
-                        DATA_dict[estimator]["RMSE"].append(np.sqrt(mean_squared_error(optEstimator.predict(X_test2), y_test)))
-                        DATA_dict[estimator]["R2"].append(r2_score(y_test, optEstimator.predict(X_test2)))
-                        DATA_dict[estimator]["Pearson"].append(pearsonr(y_test, optEstimator.predict(X_test2))[0])
-                        DATA_dict[estimator]["Spearman"].append(spearmanr(y_test, optEstimator.predict(X_test2))[0])
-                        
                         df_proteins[estimator]=[dict_proteins[estimator][key] for key in dict_proteins[estimator].keys()]
                         
                         
                 df_proteins["organism"]=df_protein_organism["organism"]
                 model_line=0
-                X2= X.copy()
                 
                 for estimator in name_models:
                     X2=X.copy()
@@ -262,14 +251,13 @@ for NNB_radius in list_NNB_radius:
                     
                     #faccio lo scaling
                     if estimator in models_with_scaling:
-                        X2=StandardScaler().fit(X2).transform(X2)
-                    else:
-                        X2=X2.copy()                    
-
+                        X2=StandardScaler().fit(X2).transform(X2)  
+                        
+                    #feature selection
                     if  estimator in models_with_fs:
                         fs=estimator_feature.fit(X2,y)
                         
-                        selection=ElasticNet(max_iter=1000,l1_ratio=l1_ratio,alpha=alpha).fit(X2,y)     
+                        selection=en.fit(X2,y)     
                         C=np.array(np.abs(selection.coef_)>0)
                         selected_features=[]
                         
@@ -281,9 +269,10 @@ for NNB_radius in list_NNB_radius:
 
                     else:
                         selected_features=[]
-                    pipeline=[]
+                    
                     
                     #uso un modello specifico
+                    pipeline=[]
                     pipeline.append(('regressor', models_dict[estimator][0]))
                     pipe=Pipeline(pipeline)
                     
