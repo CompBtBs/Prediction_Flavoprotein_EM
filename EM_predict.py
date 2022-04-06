@@ -8,39 +8,58 @@ Created on Tue Mar 29 14:18:52 2022
 ### Importo le librerie
 
 # In[]:
+from scipy.stats import pearsonr,spearmanr
 import pandas as pd
-import matplotlib.pyplot as plt
 import numpy as np
-import sys
 from sklearn.metrics import *
 from sklearn.model_selection import *
 from sklearn.linear_model import *
 from sklearn.feature_selection import *
 from sklearn.preprocessing import *
-from scipy.stats import pearsonr,spearmanr
 from sklearn.svm import SVR
-from sklearn.neighbors import KNeighborsRegressor,LocalOutlierFactor
+from sklearn.neighbors import KNeighborsRegressor
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.ensemble import RandomForestRegressor
-from xgboost import XGBRegressor
 from sklearn.pipeline import Pipeline
-from sklearn.linear_model import ElasticNetCV,LassoCV
 from sklearn.model_selection import GridSearchCV
-from sklearn.decomposition import PCA
 from sklearn.gaussian_process.kernels import RBF,ConstantKernel
-import time
 from sklearn.ensemble import IsolationForest
 from sklearn.compose import TransformedTargetRegressor
+from sklearn import feature_selection
+from sklearn.impute import SimpleImputer
+from sklearn.impute import IterativeImputer
+from xgboost import XGBRegressor
+import warnings
+import time
+from utils import RHCF,feature_selected
 # In[2]:
 
-import warnings
-#warnings.filterwarnings('ignore')
+warnings.filterwarnings('ignore')
 
-# In[5]:
+# In[5]: scelta dei modelli
+name_models=["KNR"]
+models_with_scaling=["KNR"]              #modelli a cui applicare lo scaling
+models_with_fs=["KNR"]                   #modelli a cui applicare la feature selection
+select_features=[]#feature_selected()
 
+############
+n_jobs=4                      #number of processes in parallel
 path_inputs="dataset_features/"
 path_dir_output="outputs/"
-# In[ciclo_per_più_dataset]:
+file_input_name ="proteins" #or proteins 
+list_NNB_radius=np.arange(8,17)     
+list_N5_radius=np.arange(3,6)
+###parameters
+CV=5                            #cross validation for hyperparameters tuning
+split_tuning=5                  #number of split for hyperparameters tuning (quindi 80 e 20)
+n_repeat=5                      #ripetizioni dell'esperimento
+opt="neg_mean_absolute_error"   #evaluation metric for hyperparameters tuning
+covariation=0.99
+alpha=10                        #alpha paramter for feature selection
+l1_ratio=1
+
+###############################################################################################
+# INIZIALIZZO LE STRUTTE DATI
 
 models_scan=pd.DataFrame(columns=["name_model_radius",
                                   "estimator","NNB_radius","N5_radius",
@@ -50,22 +69,13 @@ models_scan=pd.DataFrame(columns=["name_model_radius",
                                   "Mae_test_list","Error_Kfold_list","RMSE_list",
                                   "R2_test_list","Pearson_test_list","Spearman_test_list",
                                   "Best_params",
-                                  #"selected_features","n_features"
+                                  "selected_features","n_features"
                                   ])
 
-alpha=10                    #alpha paramter for feature selection
-list_NNB_radius=np.arange(8,17)     
-list_N5_radius=np.arange(3,6)
-CV=5 #cross validation for hyperparameters tuning
-opt="neg_mean_absolute_error" #evaluation metric for hyperparameters tuning
-split_tuning=5                #number of split for hyperparameters tuning (quindi 80 e 20)
-n_repeat=10                    #ripetizioni dell'esperimento
-#test_size=0.2                 #train test split 
-n_jobs=4       #number of processes in parallel
-file_input_name ="proteins" #or proteins 
 models_dict={"LR":[LinearRegression(),{}],
              'GPR':[GaussianProcessRegressor(ConstantKernel(1.0,constant_value_bounds="fixed") * RBF(1.0,length_scale_bounds="fixed")),                    
                     {
+                    
                     'regressor__regressor__alpha':np.logspace(-2, 2, 5),
                     'regressor__regressor__kernel__k1__constant_value': np.logspace(-2, 2, 5),
                     'regressor__regressor__kernel__k2__length_scale': np.logspace(-2, 2, 5)
@@ -99,18 +109,14 @@ models_dict={"LR":[LinearRegression(),{}],
 
 
 dict_proteins=dict()
-
-#add dict for selector in gridsearch
-for estimator in ["LR","KNR","SVR","GPR"]:
-    #models_dict[estimator][1]["regressor__selector__estimator__alpha"]=[10,100]    
-    models_dict[estimator][1]["regressor__selector__estimator__l1_ratio"]=[0.5,0.75,1]
-
-name_models=["LR","KNR","GPR","SVR","RF","XGB"]
-
 df_protein_organism=pd.read_csv("organism.csv",index_col=0)
 
-###############################################################################################
 # In[]:
+#inizializzo i selettori
+anova = feature_selection.SelectPercentile(f_regression)
+estimator_feature=SelectFromModel(ElasticNet(max_iter=1000,alpha=alpha,l1_ratio=l1_ratio))
+imp = SimpleImputer(missing_values=np.nan,strategy="mean")
+#imp = IterativeImputer(missing_values=np.nan)
 
 index_line=0 #index riga for model scan dataset 
 
@@ -124,9 +130,12 @@ for NNB_radius in list_NNB_radius:
             
             # Upload dataset
             #file_name="database_chains_8_4.xlsx"
-            df_pm=pd.read_excel(path_inputs+file_name,sheet_name="Sheet1",index_col=0)
-            df_pm=df_pm.drop_duplicates()
-            #df_pm=df_pm.loc[[el for el in df_pm.index if el!="1M6I"]]
+            df_pmOrig=pd.read_excel(path_inputs+file_name,sheet_name="Sheet1",index_col=0)
+            df_pm=df_pmOrig.drop_duplicates()
+            df_pm["pH"][df_pm["pH"]==7.2]=np.nan
+            columns_to_keep_=[el for el in df_pm.columns if "%" not in el and "_mean" not in el]
+            df_pm=df_pm.loc[:,columns_to_keep_]
+
             for estimator in name_models:
                 dict_proteins[estimator]=dict()
                 dict_proteins_cont[estimator]=dict()
@@ -138,26 +147,15 @@ for NNB_radius in list_NNB_radius:
             df_pm=df_pm.iloc[:,1:]
             if "Protein_name" in df_pm.columns:
                 df_pm=df_pm.drop(["Protein_name"],axis=1) 
-            
-            columns_to_keep_=[el for el in df_pm.columns if "%" not in el and "_mean" not in el]
-            df_pm=df_pm.loc[:,columns_to_keep_]
+            if len(select_features)!=0:
+                df_pm=df_pm.loc[:,select_features]
 
-            # Restituisce in output il dataset per fare Machine Learning
-                        
             # In[]:
             # Input/output
-
             X=df_pm.iloc[:,1:].values
             y=df_pm.iloc[:,0].values
-
-            #clf = IsolationForest(random_state=0).fit(X)
-            print(len(y))
-            #y=y[clf.predict(X)==1]
-            #print(len(y))
             labels = list(dict_proteins[name_models[0]].keys())
             labels=np.array(labels)
-            #labels=labels[clf.predict(X)==1]
-            #X=X[clf.predict(X)==1,:] 
             # In[]:
             # Hyperparameter Tuning
             print( "hyperparameter tuning")
@@ -179,43 +177,56 @@ for NNB_radius in list_NNB_radius:
                 for train_index, test_index  in kfold.split(X):
                     print("Split_train_test:",i)
                     i=i+1
+                    #prelevo gli indici di train e test
                     X_train=X[train_index,:]
                     y_train=y[train_index ]
                     labels_train=labels[train_index]
                     X_test=X[test_index,:]
                     y_test=y[test_index]                    
                     labels_test=labels[test_index]                         
-                        
-                    
-                    estimator_feature=ElasticNet(max_iter=1000,alpha=alpha)
-    
-                    
+                    ########faccio alcune operazioni di pre-preprocessing
+                    #faccio il fill di ph
+                    fillph=imp.fit(X_train)
+                    X_train=fillph.transform(X_train)
+                    X_test=fillph.transform(X_test)
+                    #tolgo le feature correlate
+                    remove_hcf=RHCF(covariation=covariation).fit(X_train)
+                    X_train=remove_hcf.transform(X_train)
+                    X_test=remove_hcf.transform(X_test)                    
+                    X_train2=X_train.copy()
+                    X_test2=X_test.copy()
+                    #faccio lo scaling
                     for estimator in name_models:
-                        pipeline=[]
-                        if estimator in ["LR","SVR","GPR","KNR"]:
-                            #lo scaling si fai solo per LR,SVR e GPR
-                            pipeline.append(('scaler', StandardScaler()))
-                        if  estimator in ["LR","SVR","KNR","GPR"]: 
-                            #selziono le feature solo per LR,GPR e SVR
-                            pipeline.append(('selector', SelectFromModel(estimator=estimator_feature)))
-                            
+                        #eseguo lo scaling delle variabili
+                        if estimator in models_with_scaling:
+                            sc=StandardScaler().fit(X_train2)
+                            X_train2=sc.transform(X_train2)
+                            X_test2=sc.transform(X_test2)
+                        if  estimator in models_with_fs:
+                            fs=estimator_feature.fit(X_train2,y_train)
+                            X_train2=fs.transform(X_train2)
+                            X_test2=fs.transform(X_test2)
+    
+                        pipeline=[]      
+                        #uso un modello specifico
                         pipeline.append(('regressor', models_dict[estimator][0]))
                         pipe=Pipeline(pipeline)
                         
-                        treg=TransformedTargetRegressor(regressor=pipe,transformer=None) #trasforma eventualmente la variabile y
+                        #trasforma eventualmente la variabile y
+                        treg=TransformedTargetRegressor(regressor=pipe,transformer=None) 
                         
                         optEstimator = GridSearchCV(treg, models_dict[estimator][1],
                                                     scoring=opt,cv=CV,
                                                     n_jobs=n_jobs
                                                     )
                                                     
-                        _= optEstimator.fit(X_train, y_train)
+                        _= optEstimator.fit(X_train2, y_train)
                         #print(optEstimator.best_estimator_.get_params())
                         DATA_dict[estimator]["EOKfold"].append(np.abs(optEstimator.best_score_))
-                        DATA_dict[estimator]["mae_train"].append(mean_absolute_error(optEstimator.predict(X_train), y_train))
-                        DATA_dict[estimator]["mae_test"].append(mean_absolute_error(optEstimator.predict(X_test), y_test))
+                        DATA_dict[estimator]["mae_train"].append(mean_absolute_error(optEstimator.predict(X_train2), y_train))
+                        DATA_dict[estimator]["mae_test"].append(mean_absolute_error(optEstimator.predict(X_test2), y_test))
                         
-                        values=list(np.abs(optEstimator.predict(X_test)-y_test))
+                        values=list(np.abs(optEstimator.predict(X_test2)-y_test))
     
                         for label,value in zip(labels_test,values):
                             dict_proteins[estimator][label]+=value
@@ -228,42 +239,66 @@ for NNB_radius in list_NNB_radius:
                         DATA_dict[estimator]["mae_conts"]=dict_proteins_cont[estimator]
                         
                         
-                        DATA_dict[estimator]["RMSE"].append(np.sqrt(mean_squared_error(optEstimator.predict(X_test), y_test)))
-                        DATA_dict[estimator]["R2"].append(r2_score(y_test, optEstimator.predict(X_test)))
-                        DATA_dict[estimator]["Pearson"].append(pearsonr(y_test, optEstimator.predict(X_test))[0])
-                        DATA_dict[estimator]["Spearman"].append(spearmanr(y_test, optEstimator.predict(X_test))[0])
+                        DATA_dict[estimator]["RMSE"].append(np.sqrt(mean_squared_error(optEstimator.predict(X_test2), y_test)))
+                        DATA_dict[estimator]["R2"].append(r2_score(y_test, optEstimator.predict(X_test2)))
+                        DATA_dict[estimator]["Pearson"].append(pearsonr(y_test, optEstimator.predict(X_test2))[0])
+                        DATA_dict[estimator]["Spearman"].append(spearmanr(y_test, optEstimator.predict(X_test2))[0])
                         
                         df_proteins[estimator]=[dict_proteins[estimator][key] for key in dict_proteins[estimator].keys()]
+                        
+                        
                 df_proteins["organism"]=df_protein_organism["organism"]
-                #df_proteins=df_proteins.loc[[el for el in df_proteins.index if el!="1M6I"]]
                 model_line=0
+                X2= X.copy()
+                
                 for estimator in name_models:
-    
-                    pipe = Pipeline([
-                                      ('scaler', StandardScaler()),
-                                      ('selector', SelectFromModel(estimator=estimator_feature)),
-                                      ('regressor', models_dict[estimator][0])
-                                    ])
-    
-                    treg=TransformedTargetRegressor(regressor=pipe,transformer=StandardScaler())
+                    X2=X.copy()
+                    #faccio il fill di ph
+                    fillph=imp.fit(X2)
+                    X2=fillph.transform(X2)
+                    #tolgo le feature correlate
+                    remove_hcf=RHCF(covariation=covariation).fit(X2)
+                    X2=remove_hcf.transform(X2)
+                    
+                    #faccio lo scaling
+                    if estimator in models_with_scaling:
+                        X2=StandardScaler().fit(X2).transform(X2)
+                    else:
+                        X2=X2.copy()                    
+
+                    if  estimator in models_with_fs:
+                        fs=estimator_feature.fit(X2,y)
+                        
+                        selection=ElasticNet(max_iter=1000,l1_ratio=l1_ratio,alpha=alpha).fit(X2,y)     
+                        C=np.array(np.abs(selection.coef_)>0)
+                        selected_features=[]
+                        
+                        features_index=[1+el for el in remove_hcf.to_keep]
+                        for el,el2 in zip(df_pm.columns[features_index],C):
+                            if el2==True:
+                                selected_features.append(el) 
+                        X2=fs.transform(X2)
+
+                    else:
+                        selected_features=[]
+                    pipeline=[]
+                    
+                    #uso un modello specifico
+                    pipeline.append(('regressor', models_dict[estimator][0]))
+                    pipe=Pipeline(pipeline)
+                    
+                    #trasforma eventualmente la variabile y
+                    treg=TransformedTargetRegressor(regressor=pipe,transformer=None) 
+                    
                     optEstimator = GridSearchCV(treg, models_dict[estimator][1],
-                                                scoring=opt,cv=CV,n_jobs=n_jobs
-                                                )
+                                                scoring=opt,cv=CV,
+                                                n_jobs=n_jobs
+                                                )                    
                     
-                    
-                    best_model=optEstimator.fit(X,y)
+                    best_model=optEstimator.fit(X2,y)
                     best_params=best_model.best_params_
-                    #l1_ratio=best_model.best_params_["regressor__selector__estimator__l1_ratio"]
-    
-                    X_scaling=StandardScaler().fit(X).transform(X)     
-                    #selection=ElasticNet(max_iter=1000,l1_ratio=l1_ratio,alpha=alpha).fit(X_scaling,y)     
-                    #C=np.array(np.abs(selection.coef_)>0)
                     
-                    #selected_features=[]
-                    #for el,el2 in zip(df_pm.columns[1:],C):
-                    #    if el2==True:
-                    #        selected_features.append(el) 
-                    
+
                     models_scan.loc[(index_line + model_line)]=[(estimator+"_"+str(NNB_radius)+"_"+str(N5_radius)),
                                                                     estimator,
                                                                     int(NNB_radius),
@@ -288,8 +323,8 @@ for NNB_radius in list_NNB_radius:
                                                                     list(DATA_dict[estimator]["Pearson"]),
                                                                     list(DATA_dict[estimator]["Spearman"]),   
                                                                     best_params,
-                                                                    #list(selected_features),
-                                                                    #len(selected_features)
+                                                                    list(selected_features),
+                                                                    len(selected_features)
                                                                     ]
                     model_line+=1
                     
