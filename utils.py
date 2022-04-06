@@ -14,6 +14,31 @@ import numpy as np
 from numpy.linalg import norm as norm2
 from sklearn.ensemble import IsolationForest
 
+def feature_selected():
+    return [
+     "EM",
+     'pH',
+  'Oxygen_H_bond',
+  'Pi-Pi_Stacking',
+  'Stacking_Alifatico',
+  'Pi_cation',
+  'NNB.ALA',
+  'ASP',
+  'CYS',
+  'NNB.GLU',
+  'HIS',
+  'NNB.HIS',
+  'Nitrogen_around',
+  'NNB.nNats in side chain',
+  'N5.Isoelectric point',
+  'N5.log(Solub) x Flex',
+  'N3_amm.Hydrophobicity x Flex.',
+  'RESNEG',
+  '_SolventAccessibilityC2',
+  '_HydrophobicityC1',
+  '_HydrophobicityC3'        
+        ]
+
 def RemoveOutliar(X,y):
     clf = IsolationForest(random_state=0).fit(X)
     X_=X.copy()
