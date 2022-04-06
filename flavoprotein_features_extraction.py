@@ -39,10 +39,9 @@ d3to1 = {'CYS': 'C', 'ASP': 'D', 'SER': 'S', 'GLN': 'Q', 'LYS': 'K',
 
 path_dir=""
 #%% leggo il file dove sono presente le proteine da considerare
-#path_dir1="G:/Altri computer/Computer_Laboratorio/"
-path_dir1="C:/Users/AM866527/Desktop/"
-dataset=pd.read_excel(path_dir1+"AntonioM/Features_extraction/PDB_LIST_PH.xlsx",
-                      usecols=(1,2))
+path_dir1="G:/Altri computer/Computer_Laboratorio/"
+#path_dir1="C:/Users/AM866527/Desktop/"
+dataset=pd.read_excel(path_dir1+"AntonioM/final_dataset_Em_flavoproteins.xlsx",usecols=(0,4,5))
 dataset_pH=pd.read_excel(path_dir1+"AntonioM/Features_extraction/PDB_LIST_PH.xlsx",
                       usecols=(1,3))
 dataset_6_variables=pd.read_excel(path_dir1+"AntonioM/Dataset/dataset_completo.xlsx", 
