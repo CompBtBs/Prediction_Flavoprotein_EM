@@ -14,8 +14,8 @@ import pandas as pd
 from utils import get_baricentro,get_atoms_coord,get_covariance,inizializza_dict_amm,feature_conteggio,specific_feature
 #%% parametri di lancio
 
-list_NNB=list(np.arange(8,9))          #distanza rispetto al baricentro dell'anello isocoso
-list_N5=list(np.arange(3,4))            #distanza rispetto ad N5 dell'anello isocoso
+list_NNB=list(np.arange(8,17))          #distanza rispetto al baricentro dell'anello isocoso
+list_N5=list(np.arange(3,7))            #distanza rispetto ad N5 dell'anello isocoso
   
 amm_names=["ALA","ARG","ASN","ASP","CYS",
           "GLN","GLU","GLY","HIS","ILE",
@@ -29,14 +29,12 @@ d3to1 = {'CYS': 'C', 'ASP': 'D', 'SER': 'S', 'GLN': 'Q', 'LYS': 'K',
 
 path_dir=""
 #%% leggo il file dove sono presente le proteine da considerare
-#path_dir1="G:/Altri computer/Computer_Laboratorio/"
-path_dir1="C:/Users/AM866527/Desktop/"
-dataset=pd.read_excel(path_dir1+"AntonioM/final_dataset_Em_flavoproteins.xlsx",usecols=(0,3,4))
-#dataset["pH"]=dataset["pH"].fillna(np.round(np.mean(dataset["pH"]),1))
+dataset=pd.read_excel(path_dir+"data/final_dataset_Em_flavoproteins.xlsx",usecols=(0,3,4))
+features_DS=pd.read_excel(path_dir+"data/DS_Visualizer_Features.xlsx")
 
 proteins_PDB=list(OrderedDict.fromkeys(dataset["PDB ID"])) #list of PDB ID used
 
-table_amm=pd.read_csv(path_dir1+"AntonioM/Features_extraction/tabellaAmm.txt",
+table_amm=pd.read_csv(path_dir+"data/tabellaAmm.txt",
                       sep="\t",index_col=1)#,header=None)#.reset_index()
 table_amm.index=[el.upper() for el in table_amm.index]
 table_amm=table_amm.iloc[:,1:]
@@ -52,7 +50,7 @@ for NNB in list_NNB:
 
 #%%ciclo for sulle varie proteine
 
-        for name_protein in proteins_PDB[0:4]:
+        for name_protein in proteins_PDB:
             
             #download pdb file  
             pdbl.retrieve_pdb_file(name_protein, pdir = '.', file_format = 'pdb')
@@ -148,32 +146,27 @@ for NNB in list_NNB:
                     if total_NNB==0:
                         total_NNB=1 
                     
-                    #calcolo le percentuali
-                    #for nome in amm_names: #20+20
-                        #dict_cont[nome+"%"]=dict_cont[nome]/total*100
-                        #dict_cont["Protein."+nome+"%"]=dict_cont["Protein."+nome]/total_protein*100
-                        #dict_cont["NNB."+nome+"%"]=dict_cont["Protein."+nome]/total_NNB*100
                     
                     #calcolo i descrittori Pone per l'intorno dell'anello (rispetto al baricentro)
                     for col in table_amm.columns: #28+28
                         values=table_amm[col]
                         val_feature=np.sum([values[nome]*dict_cont[nome] for nome in amm_names])
                         dict_cont[col]=val_feature
-                        #dict_cont[col+"_mean"]=val_feature/total
+                        
             
                     #calcolo i descrittori per tutta la proteina
                     for col in table_amm.columns: 
                         values=table_amm[col]
                         val_feature=sum([values[nome]*dict_cont["Protein."+nome] for nome in amm_names])
                         dict_cont["Protein."+col]=val_feature
-                        #dict_cont["Protein."+col+"_mean"]=val_feature/total_protein        
+                               
                     
                     #calcolo i descrittori Pone per l'intorno dell'anello ( rispetto a un atomo qualunque)
                     for col in table_amm.columns: 
                         values=table_amm[col]
                         val_feature=np.sum([values[nome]*dict_cont["NNB."+nome] for nome in amm_names])
                         dict_cont["NNB."+col]=val_feature
-                        #dict_cont["NNB."+col+"_mean"]=val_feature/total_NNB           
+                                   
                         
                     #calcolo descrittori dell'amminoacido davanti a N5
                     if N5_nearest_res:
@@ -205,8 +198,6 @@ for NNB in list_NNB:
                     protein_descriptor = CTD.CalculateC(lista_fasta)
                     
                     #esegue il merge di due dizionari che in questo caso sono quello relativo alle features da codice e le features di PyBioMed
-                    #dict_cont=dict_cont.update(AAC)
-                    #dict_cont=dict_cont.update(protein_descriptor)
                     dict_cont={**dict_cont,**protein_descriptor}
         
         
@@ -233,9 +224,8 @@ for NNB in list_NNB:
         
         df_total=df_total.groupby("PDB ID").agg(lambda x: np.round(np.mean(x),2))
         
-        features_DS=pd.read_excel(path_dir1+"AntonioM/DS_Visualizer_Features.xlsx")
         dataset=dataset.merge(features_DS, on="PDB ID")
         dataset=dataset.join(df_total, on="PDB ID")        
-        dataset.to_excel(path_dir1+"AntonioM/Dataset_Proteins/database_protein_"+str(NNB)+"_"+str(N5)+".xlsx")    
+        dataset.to_excel(path_dir+"/dataset_features/database_protein_"+str(NNB)+"_"+str(N5)+".xlsx")    
         
 

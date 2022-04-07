@@ -163,10 +163,6 @@ def specific_feature(dict_cont,prefisso="",mean=True,total=None):
     dict_cont[prefisso+"ResPolari"]=np.sum([dict_cont[el] for el in polari])
     dict_cont[prefisso+"ResAromatici"]=np.sum([dict_cont[el] for el in aromatici])
     
-    if mean:
-        dict_cont[prefisso+"ResApolari_mean"]=dict_cont[prefisso+"ResApolari"]/total
-        dict_cont[prefisso+"ResPolari_mean"]=dict_cont[prefisso+"ResPolari"]/total
-        dict_cont[prefisso+"ResAromatici_mean"]=dict_cont[prefisso+"ResAromatici"]/total
     
     return dict_cont
 #%% definisco alcune funzione utili
