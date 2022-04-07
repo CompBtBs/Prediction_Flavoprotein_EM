@@ -224,8 +224,8 @@ for NNB in list_NNB:
         
         df_total=df_total.groupby("PDB ID").agg(lambda x: np.round(np.mean(x),2))
         
-        dataset=dataset.merge(features_DS, on="PDB ID")
-        dataset=dataset.join(df_total, on="PDB ID")        
-        dataset.to_excel(path_dir+"/dataset_features/database_protein_"+str(NNB)+"_"+str(N5)+".xlsx")    
+        dataset2=dataset.merge(features_DS, on="PDB ID")
+        dataset2=dataset2.join(df_total, on="PDB ID")        
+        dataset2.to_excel(path_dir+"dataset_features/database_protein_"+str(NNB)+"_"+str(N5)+".xlsx")    
         
 
