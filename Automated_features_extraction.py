@@ -14,7 +14,7 @@ import pandas as pd
 from utils import get_baricentro,get_atoms_coord,get_covariance,inizializza_dict_amm,feature_conteggio,specific_feature
 #%% parametri di lancio
 
-list_NNB=list(np.arange(8,17))          #distanza rispetto al baricentro dell'anello isocoso
+list_NNB=list(np.arange(11,17))          #distanza rispetto al baricentro dell'anello isocoso
 list_N5=list(np.arange(3,7))            #distanza rispetto ad N5 dell'anello isocoso
   
 amm_names=["ALA","ARG","ASN","ASP","CYS",
