@@ -11,11 +11,11 @@ Created on Tue Mar 29 14:18:52 2022
 from scipy.stats import pearsonr,spearmanr
 import pandas as pd
 import numpy as np
-from sklearn.metrics import *
-from sklearn.model_selection import *
-from sklearn.linear_model import *
-from sklearn.feature_selection import *
-from sklearn.preprocessing import *
+from sklearn.metrics import mean_absolute_error,mean_squared_error,r2_score
+from sklearn.model_selection import KFold
+from sklearn.linear_model import LinearRegression,ElasticNet
+from sklearn.feature_selection import SelectFromModel
+from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVR
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.gaussian_process import GaussianProcessRegressor
@@ -25,29 +25,28 @@ from sklearn.model_selection import GridSearchCV
 from sklearn.gaussian_process.kernels import RBF,ConstantKernel
 from sklearn.ensemble import IsolationForest
 from sklearn.compose import TransformedTargetRegressor
-from sklearn import feature_selection
 from sklearn.impute import SimpleImputer
 from xgboost import XGBRegressor
 import warnings
 import time
-from utils import RHCF,feature_selected
+from utils import RHCF,feature_selected,RemoveOutliar
 # In[2]:
 
 warnings.filterwarnings('ignore')
 
 # In[5]: scelta dei modelli
-name_models=["LR","KNR","SVR","GPR","RF","XGB"]
-models_with_scaling=["LR","KNR","SVR","GPR"]              #modelli a cui applicare lo scaling
-models_with_fs=["LR","KNR","SVR","GPR"]                   #modelli a cui applicare la feature selection
+name_models=["LR","KNR"]
+models_with_scaling=["LR","KNR"]              #modelli a cui applicare lo scaling
+models_with_ro=[]
+models_with_fs=["LR","KNR"]                   #modelli a cui applicare la feature selection
 select_features=[]#feature_selected()
-
+filter_proteins=True
 ############
 n_jobs=4                      #number of processes in parallel
 path_inputs="dataset_features/"
 path_dir_output="outputs/"
-file_input_name ="protein" #or proteins 
-list_NNB_radius=np.arange(8,9)     
-list_N5_radius=np.arange(3,4)
+list_NNB_radius=np.arange(8,11)     
+list_N5_radius=np.arange(3,7)
 ###parameters
 n_repeat=5                      #ripetizioni dell'esperimento
 split_tuning=5                  #number of split for hyperparameters tuning (quindi 80 e 20)
@@ -58,6 +57,10 @@ alpha=10                        #alpha paramter for feature selection
 l1_ratio=1                      #
 
 ###############################################################################################
+#%
+df_data=pd.read_excel("data/final_dataset_Em_flavoproteins.xlsx")
+proteins=list(df_data[df_data["reference"]!="mancante"]["PDB ID"].values)
+
 # INIZIALIZZO LE STRUTTE DATI
 
 models_scan=pd.DataFrame(columns=["name_model_radius",
@@ -99,17 +102,15 @@ models_dict={"LR":[LinearRegression(),{}],
                     }],
              "XGB":[XGBRegressor(),
                     {
-                    "regressor__regressor__learning_rate" : [0.01,0.1,0.2,0.4],
+                    #"regressor__regressor__learning_rate" : [0.01,0.1,0.2,0.4],
                     "regressor__regressor__max_depth" : [3,4,5],
-                    "regressor__regressor__min_child_weight" : [1,5,10],
+                    #"regressor__regressor__min_child_weight" : [1,5,10],
                     "regressor__regressor__n_estimators" : [100,150,200]
                     }]
              } 
 
 
 dict_proteins=dict()
-df_protein_organism=pd.read_csv("organism.csv",index_col=0)
-
 # In[]:
 #inizializzo i selettori
 en=ElasticNet(max_iter=1000,alpha=alpha,l1_ratio=l1_ratio)
@@ -124,21 +125,23 @@ for NNB_radius in list_NNB_radius:
             dict_proteins=dict()
             dict_proteins_cont=dict()
 #%%
-            file_name="database_"+file_input_name+"_"+str(NNB_radius)+"_"+str(N5_radius)+".xlsx"
+            file_name="database_protein_"+str(NNB_radius)+"_"+str(N5_radius)+".xlsx"
             print(file_name)
             
             # Upload dataset
             df_pmOrig=pd.read_excel(path_inputs+file_name,sheet_name="Sheet1",index_col=0)
             df_pm=df_pmOrig.drop_duplicates()
-            columns_to_keep_=[el for el in df_pm.columns if "%" not in el and "_mean" not in el]
-            df_pm=df_pm.loc[:,columns_to_keep_]
+            if filter_proteins:
+                df_pm=df_pm.loc[df_pm["PDB ID"].isin(proteins) ]
 
             for estimator in name_models:
                 dict_proteins[estimator]=dict()
                 dict_proteins_cont[estimator]=dict()
-                for key in df_pm.index:
-                    dict_proteins[estimator][key]=0
-                    dict_proteins_cont[estimator][key]=0
+                cont=0
+                for key in df_pm["PDB ID"].values:
+                    dict_proteins[estimator][key+"_"+str(cont)]=0
+                    dict_proteins_cont[estimator][key+"_"+str(cont)]=0
+                    cont+=1
                     
             df_pm=df_pm.iloc[:,1:]
 
@@ -188,14 +191,20 @@ for NNB_radius in list_NNB_radius:
                     X_train=remove_hcf.transform(X_train)
                     X_test=remove_hcf.transform(X_test)                    
                     X_train2=X_train.copy()
-                    X_test2=X_test.copy()
-                    #faccio lo scaling
+                    X_test2=X_test.copy()                                
+                    
                     for estimator in name_models:
                         #eseguo lo scaling delle variabili
                         if estimator in models_with_scaling:
                             sc=StandardScaler().fit(X_train2)
                             X_train2=sc.transform(X_train2)
                             X_test2=sc.transform(X_test2)
+                        #rimuovo gli outliar
+                        if estimator in models_with_ro:
+                            clf = IsolationForest(random_state=0).fit(X_train2)
+                            y_train=y_train[clf.predict(X_train2)==1]  
+                            X_train2=X_train2[clf.predict(X_train2)==1,:]                  
+                        #faccio feature selection
                         if  estimator in models_with_fs:
                             fs=estimator_feature.fit(X_train2,y_train)
                             X_train2=fs.transform(X_train2)
@@ -235,9 +244,8 @@ for NNB_radius in list_NNB_radius:
                             dict_proteins[estimator][label]=dict_proteins[estimator][label]/dict_proteins_cont[estimator][label]
                         
                         df_proteins[estimator]=[dict_proteins[estimator][key] for key in dict_proteins[estimator].keys()]
-                        
-                        
-                df_proteins["organism"]=df_protein_organism["organism"]
+                        df_proteins["EM"]=y
+
                 model_line=0
                 
                 for estimator in name_models:
@@ -248,11 +256,10 @@ for NNB_radius in list_NNB_radius:
                     #tolgo le feature correlate
                     remove_hcf=RHCF(covariation=covariation).fit(X2)
                     X2=remove_hcf.transform(X2)
-                    
                     #faccio lo scaling
                     if estimator in models_with_scaling:
                         X2=StandardScaler().fit(X2).transform(X2)  
-                        
+
                     #feature selection
                     if  estimator in models_with_fs:
                         fs=estimator_feature.fit(X2,y)
@@ -322,7 +329,7 @@ for NNB_radius in list_NNB_radius:
             executionTime = (time.time () - startTime) 
             print ('Execution time in seconds: ' + str (executionTime)) 
             
-            models_scan.to_excel(path_dir_output+file_input_name+".xlsx")  
+            models_scan.to_excel(path_dir_output+"results.xlsx")  
             df_proteins.to_csv(path_dir_output+"analysis_proteins_NNB_"+str(NNB_radius)+"_N5_"+str(N5_radius)+".csv")
             index_line+=len(name_models)
             
