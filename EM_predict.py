@@ -37,7 +37,7 @@ warnings.filterwarnings('ignore')
 # In[5]: scelta dei modelli
 name_models=["LR","KNR"]
 models_with_scaling=["LR","KNR"]              #modelli a cui applicare lo scaling
-models_with_ro=[]
+#models_with_ro=[]
 models_with_fs=["LR","KNR"]                   #modelli a cui applicare la feature selection
 select_features=[]#feature_selected()
 filter_proteins=True
@@ -45,7 +45,7 @@ filter_proteins=True
 n_jobs=4                      #number of processes in parallel
 path_inputs="dataset_features/"
 path_dir_output="outputs/"
-list_NNB_radius=np.arange(8,11)     
+list_NNB_radius=np.arange(8,13)     
 list_N5_radius=np.arange(3,7)
 ###parameters
 n_repeat=5                      #ripetizioni dell'esperimento
@@ -54,7 +54,7 @@ CV=5                            #cross validation for hyperparameters tuning
 opt="neg_mean_absolute_error"   #evaluation metric for hyperparameters tuning
 covariation=0.99                #valore della correlazione
 alpha=10                        #alpha paramter for feature selection
-l1_ratio=1                      #
+l1_ratio=0.75                      #
 
 ###############################################################################################
 #%
@@ -66,7 +66,7 @@ proteins=list(df_data[df_data["reference"]!="mancante"]["PDB ID"].values)
 models_scan=pd.DataFrame(columns=["name_model_radius",
                                   "estimator","NNB_radius","N5_radius",
                                   "MAE_train","sd_train",
-                                  "MAE_test","sd_test","MAE_lists","MAE_conts",
+                                  "MAE_test","sd_test","MAE_lists",
                                   "mean_error_kfold","sd_error_kfold","RMSE","sd_RMSE","R2","Pearson","Spearman",
                                   "Mae_test_list","Error_Kfold_list","RMSE_list",
                                   "R2_test_list","Pearson_test_list","Spearman_test_list",
@@ -74,26 +74,37 @@ models_scan=pd.DataFrame(columns=["name_model_radius",
                                   "selected_features","n_features"
                                   ])
 
-models_dict={"LR":[LinearRegression(),{}],
-             'GPR':[GaussianProcessRegressor(ConstantKernel(1.0,constant_value_bounds="fixed") * RBF(1.0,length_scale_bounds="fixed")),                    
-                    {
-                    
-                    'regressor__regressor__alpha':np.logspace(-2, 2, 5),
-                    'regressor__regressor__kernel__k1__constant_value': np.logspace(-2, 2, 5),
-                    'regressor__regressor__kernel__k2__length_scale': np.logspace(-2, 2, 5)
-                    }],
-             'SVR':[SVR(kernel="rbf"),                   
-                    {
-                    'regressor__regressor__C': np.logspace(-3,3,7),
-                    'regressor__regressor__gamma': np.logspace(-3,3,7)
-                    #'regressor__epsilon': np.logspace(-1,0,2)
-                    }],
+models_dict={"LR":[LinearRegression(),{
+                    'regressor__feature_selection__estimator__alpha':[10,100],
+                    'regressor__feature_selection__estimator__l1_ratio':[0.5,0.75,1],
+    
+    }],
              'KNR':[KNeighborsRegressor(),
                     {           
+                    'regressor__feature_selection__estimator__alpha':[10,100],
+                    'regressor__feature_selection__estimator__l1_ratio':[0.5,0.75,1],
                     'regressor__regressor__n_neighbors': [2, 3, 4, 5, 6, 7],
                     'regressor__regressor__metric': ['euclidean','manhattan'],
                     'regressor__regressor__weights':  ["uniform", "distance"]
                     }],
+    
+             'SVR':[SVR(kernel="rbf"),                   
+                    {
+                    'regressor__feature_selection__estimator__alpha':[10,100],
+                    'regressor__feature_selection__estimator__l1_ratio':[0.5,0.75,1],
+                    'regressor__regressor__C': np.logspace(-3,3,7),
+                    'regressor__regressor__gamma': np.logspace(-3,3,7)
+                    #'regressor__epsilon': np.logspace(-1,0,2)
+                    }],   
+             'GPR':[GaussianProcessRegressor(ConstantKernel(1.0,constant_value_bounds="fixed") * RBF(1.0,length_scale_bounds="fixed")),                    
+                    {
+                    'regressor__feature_selection__estimator__alpha':[10,100],
+                    'regressor__feature_selection__estimator__l1_ratio':[0.5,0.75,1],                    
+                    'regressor__regressor__alpha':np.logspace(-2, 2, 5),
+                    'regressor__regressor__kernel__k1__constant_value': np.logspace(-2, 2, 5),
+                    'regressor__regressor__kernel__k2__length_scale': np.logspace(-2, 2, 5)
+                    }],
+
              "RF":[RandomForestRegressor(),
                    {
                     'regressor__regressor__n_estimators': [100,150,200],
@@ -117,30 +128,29 @@ en=ElasticNet(max_iter=1000,alpha=alpha,l1_ratio=l1_ratio)
 estimator_feature=SelectFromModel(en)
 imp = SimpleImputer(missing_values=np.nan,strategy="mean")
 #imp = IterativeImputer(missing_values=np.nan)
-
+df_proteins=None
 index_line=0 #index riga for model scan dataset 
 
 for NNB_radius in list_NNB_radius: 
     for N5_radius in list_N5_radius:
             dict_proteins=dict()
-            dict_proteins_cont=dict()
 #%%
             file_name="database_protein_"+str(NNB_radius)+"_"+str(N5_radius)+".xlsx"
             print(file_name)
             
             # Upload dataset
             df_pmOrig=pd.read_excel(path_inputs+file_name,sheet_name="Sheet1",index_col=0)
-            df_pm=df_pmOrig.drop_duplicates()
             if filter_proteins:
-                df_pm=df_pm.loc[df_pm["PDB ID"].isin(proteins) ]
+                df_data=df_data.loc[df_data["PDB ID"].isin(proteins) ]
+                df_pmOrig=df_pmOrig.loc[df_pmOrig["PDB ID"].isin(proteins) ]
+            df_pm=df_pmOrig.copy()#drop_duplicates()
+
 
             for estimator in name_models:
                 dict_proteins[estimator]=dict()
-                dict_proteins_cont[estimator]=dict()
                 cont=0
                 for key in df_pm["PDB ID"].values:
                     dict_proteins[estimator][key+"_"+str(cont)]=0
-                    dict_proteins_cont[estimator][key+"_"+str(cont)]=0
                     cont+=1
                     
             df_pm=df_pm.iloc[:,1:]
@@ -158,7 +168,8 @@ for NNB_radius in list_NNB_radius:
             # Hyperparameter Tuning
             print( "hyperparameter tuning")
             # In[]:
-            df_proteins=pd.DataFrame(index=labels)
+            if df_proteins is None:
+                df_proteins=pd.DataFrame(index=labels)
 
 
             DATA_dict={name_model:{"mae_train":[],"mae_test":[],"mae_lists":[],"RMSE":[],"R2":[],"Pearson":[],"Spearman":[],"EOKfold":[]} for name_model in name_models}
@@ -166,6 +177,7 @@ for NNB_radius in list_NNB_radius:
             startTime = time.time ()
             
             i=0
+            
             for j in range(n_repeat):
                 #ripeto la neste n volte ma così facendo tutte le proteine vengono visitate lo stesso numero di volte
                 kfold=KFold(n_splits=split_tuning, random_state=j, shuffle=True)
@@ -199,18 +211,22 @@ for NNB_radius in list_NNB_radius:
                             sc=StandardScaler().fit(X_train2)
                             X_train2=sc.transform(X_train2)
                             X_test2=sc.transform(X_test2)
-                        #rimuovo gli outliar
-                        if estimator in models_with_ro:
-                            clf = IsolationForest(random_state=0).fit(X_train2)
-                            y_train=y_train[clf.predict(X_train2)==1]  
-                            X_train2=X_train2[clf.predict(X_train2)==1,:]                  
+                        # #rimuovo gli outliar
+                        # if estimator in models_with_ro:
+                        #     clf = IsolationForest(random_state=0).fit(X_train2)
+                        #     y_train=y_train[clf.predict(X_train2)==1]  
+                        #     X_train2=X_train2[clf.predict(X_train2)==1,:]                  
                         #faccio feature selection
-                        if  estimator in models_with_fs:
-                            fs=estimator_feature.fit(X_train2,y_train)
-                            X_train2=fs.transform(X_train2)
-                            X_test2=fs.transform(X_test2)
+                        # if  estimator in models_with_fs:
+                        #     fs=estimator_feature.fit(X_train2,y_train)
+                        #     X_train2=fs.transform(X_train2)
+                        #     X_test2=fs.transform(X_test2)
     
-                        pipeline=[]      
+                        pipeline=[]    
+                        #feature selection
+                        if  estimator in models_with_fs:
+                            pipeline.append(('feature_selection', estimator_feature))
+                        
                         #uso un modello specifico
                         pipeline.append(('regressor', models_dict[estimator][0]))
                         pipe=Pipeline(pipeline)
@@ -229,7 +245,6 @@ for NNB_radius in list_NNB_radius:
                         DATA_dict[estimator]["mae_train"].append(mean_absolute_error(optEstimator.predict(X_train2), y_train))
                         DATA_dict[estimator]["mae_test"].append(mean_absolute_error(optEstimator.predict(X_test2), y_test))
                         DATA_dict[estimator]["mae_lists"]=dict_proteins[estimator]
-                        DATA_dict[estimator]["mae_conts"]=dict_proteins_cont[estimator]
                         DATA_dict[estimator]["RMSE"].append(np.sqrt(mean_squared_error(optEstimator.predict(X_test2), y_test)))
                         DATA_dict[estimator]["R2"].append(r2_score(y_test, optEstimator.predict(X_test2)))
                         DATA_dict[estimator]["Pearson"].append(pearsonr(y_test, optEstimator.predict(X_test2))[0])
@@ -238,91 +253,114 @@ for NNB_radius in list_NNB_radius:
                         values=list(np.abs(optEstimator.predict(X_test2)-y_test))
                         for label,value in zip(labels_test,values):
                             dict_proteins[estimator][label]+=value
-                            dict_proteins_cont[estimator][label]+=1
                             
-                        for label in labels_test:
-                            dict_proteins[estimator][label]=dict_proteins[estimator][label]/dict_proteins_cont[estimator][label]
-                        
-                        df_proteins[estimator]=[dict_proteins[estimator][key] for key in dict_proteins[estimator].keys()]
-                        df_proteins["EM"]=y
-
-                model_line=0
+            #ogni proteina è visita esattamente n_repeat volte!!!
+            for label in labels:
+                dict_proteins[estimator][label]=dict_proteins[estimator][label]/n_repeat
+            
+            df_proteins[estimator+"_"+str(NNB_radius)+"_"+str(N5_radius)]=[dict_proteins[estimator][key] for key in dict_proteins[estimator].keys()]
+            if "Em" not in df_proteins.columns:
+                df_proteins.insert(loc = 0,
+                          column = 'Em',
+                          value = df_data["Em"].values)            
+            if "Organism" not in df_proteins.columns:
+                df_proteins.insert(loc = 1,
+                          column = 'Organism',
+                          value = df_data["Organism "].values)
+            if "Cofactor" not in df_proteins.columns:
+                df_proteins.insert(loc = 2,
+                          column = 'Cofactor',
+                          value = df_data["Cofactor"].values)
+            if "reference" not in df_proteins.columns:
+                df_proteins.insert(loc = 3,
+                          column = 'reference',
+                          value = df_data["reference"].values)
+            df_proteins.to_csv(path_dir_output+"analysis_proteins.csv")
+            model_line=0
                 
-                for estimator in name_models:
-                    X2=X.copy()
-                    #faccio il fill di ph
-                    fillph=imp.fit(X2)
-                    X2=fillph.transform(X2)
-                    #tolgo le feature correlate
-                    remove_hcf=RHCF(covariation=covariation).fit(X2)
-                    X2=remove_hcf.transform(X2)
-                    #faccio lo scaling
-                    if estimator in models_with_scaling:
-                        X2=StandardScaler().fit(X2).transform(X2)  
+            for estimator in name_models:
+                X2=X.copy()
+                #faccio il fill di ph
+                fillph=imp.fit(X2)
+                X2=fillph.transform(X2)
+                #tolgo le feature correlate
+                remove_hcf=RHCF(covariation=covariation).fit(X2)
+                X2=remove_hcf.transform(X2)
+                #faccio lo scaling
+                if estimator in models_with_scaling:
+                    X2=StandardScaler().fit(X2).transform(X2)  
 
-                    #feature selection
-                    if  estimator in models_with_fs:
-                        fs=estimator_feature.fit(X2,y)
-                        
-                        selection=en.fit(X2,y)     
-                        C=np.array(np.abs(selection.coef_)>0)
-                        selected_features=[]
-                        
-                        features_index=[1+el for el in remove_hcf.to_keep]
-                        for el,el2 in zip(df_pm.columns[features_index],C):
-                            if el2==True:
-                                selected_features.append(el) 
-                        X2=fs.transform(X2)
+                #uso un modello specifico
+                pipeline=[]
+                #feature selection
+                if  estimator in models_with_fs:
+                    pipeline.append(('feature_selection', estimator_feature))                
+                
+                pipeline.append(('regressor', models_dict[estimator][0]))
+                pipe=Pipeline(pipeline)
+                
+                #trasforma eventualmente la variabile y
+                treg=TransformedTargetRegressor(regressor=pipe,transformer=None) 
+                
+                optEstimator = GridSearchCV(treg, models_dict[estimator][1],
+                                            scoring=opt,cv=CV,
+                                            n_jobs=n_jobs
+                                            )                    
+                
+                best_model=optEstimator.fit(X2,y)
+                best_params=best_model.best_params_
+                
+                
+                alphaTot=best_model.best_params_['regressor__feature_selection__estimator__alpha']
+                l1_ratioTot=best_model.best_params_['regressor__feature_selection__estimator__l1_ratio']
+                enTot=ElasticNet(max_iter=1000,alpha=alphaTot,l1_ratio=l1_ratioTot)
+                estimator_featureTot=SelectFromModel(enTot)
+                #feature selection
+                if  estimator in models_with_fs:
+                    fs=estimator_featureTot.fit(X2,y)
+                    
+                    selection=en.fit(X2,y)     
+                    C=np.array(np.abs(selection.coef_)>0)
+                    selected_features=[]
+                    
+                    features_index=[1+el for el in remove_hcf.to_keep]
+                    for el,el2 in zip(df_pm.columns[features_index],C):
+                        if el2==True:
+                            selected_features.append(el) 
+                    X2=fs.transform(X2)
 
-                    else:
-                        selected_features=[]
-                    
-                    
-                    #uso un modello specifico
-                    pipeline=[]
-                    pipeline.append(('regressor', models_dict[estimator][0]))
-                    pipe=Pipeline(pipeline)
-                    
-                    #trasforma eventualmente la variabile y
-                    treg=TransformedTargetRegressor(regressor=pipe,transformer=None) 
-                    
-                    optEstimator = GridSearchCV(treg, models_dict[estimator][1],
-                                                scoring=opt,cv=CV,
-                                                n_jobs=n_jobs
-                                                )                    
-                    
-                    best_model=optEstimator.fit(X2,y)
-                    best_params=best_model.best_params_
-                    
+                else:
+                    selected_features=[]
 
-                    models_scan.loc[(index_line + model_line)]=[(estimator+"_"+str(NNB_radius)+"_"+str(N5_radius)),
-                                                                    estimator,
-                                                                    int(NNB_radius),
-                                                                    int(N5_radius),                
-                                                                    np.mean(DATA_dict[estimator]["mae_train"]),
-                                                                    np.std(DATA_dict[estimator]["mae_train"]),
-                                                                    np.mean(DATA_dict[estimator]["mae_test"]),
-                                                                    np.std(DATA_dict[estimator]["mae_test"]),
-                                                                    DATA_dict[estimator]["mae_lists"],
-                                                                    DATA_dict[estimator]["mae_conts"],
-                                                                    np.mean(DATA_dict[estimator]["EOKfold"]),
-                                                                    np.std(DATA_dict[estimator]["EOKfold"]),
-                                                                    np.mean(DATA_dict[estimator]["RMSE"]),
-                                                                    np.std(DATA_dict[estimator]["RMSE"]),
-                                                                    np.mean(DATA_dict[estimator]["R2"]),
-                                                                    np.mean(DATA_dict[estimator]["Pearson"]),
-                                                                    np.mean(DATA_dict[estimator]["Spearman"]),
-                                                                    list(DATA_dict[estimator]["mae_test"]),
-                                                                    list(DATA_dict[estimator]["EOKfold"]),
-                                                                    list(DATA_dict[estimator]["RMSE"]),
-                                                                    list(DATA_dict[estimator]["R2"]),
-                                                                    list(DATA_dict[estimator]["Pearson"]),
-                                                                    list(DATA_dict[estimator]["Spearman"]),   
-                                                                    best_params,
-                                                                    list(selected_features),
-                                                                    len(selected_features)
-                                                                    ]
-                    model_line+=1
+
+
+                models_scan.loc[(index_line + model_line)]=[(estimator+"_"+str(NNB_radius)+"_"+str(N5_radius)),
+                                                                estimator,
+                                                                int(NNB_radius),
+                                                                int(N5_radius),                
+                                                                np.mean(DATA_dict[estimator]["mae_train"]),
+                                                                np.std(DATA_dict[estimator]["mae_train"]),
+                                                                np.mean(DATA_dict[estimator]["mae_test"]),
+                                                                np.std(DATA_dict[estimator]["mae_test"]),
+                                                                DATA_dict[estimator]["mae_lists"],
+                                                                np.mean(DATA_dict[estimator]["EOKfold"]),
+                                                                np.std(DATA_dict[estimator]["EOKfold"]),
+                                                                np.mean(DATA_dict[estimator]["RMSE"]),
+                                                                np.std(DATA_dict[estimator]["RMSE"]),
+                                                                np.mean(DATA_dict[estimator]["R2"]),
+                                                                np.mean(DATA_dict[estimator]["Pearson"]),
+                                                                np.mean(DATA_dict[estimator]["Spearman"]),
+                                                                list(DATA_dict[estimator]["mae_test"]),
+                                                                list(DATA_dict[estimator]["EOKfold"]),
+                                                                list(DATA_dict[estimator]["RMSE"]),
+                                                                list(DATA_dict[estimator]["R2"]),
+                                                                list(DATA_dict[estimator]["Pearson"]),
+                                                                list(DATA_dict[estimator]["Spearman"]),   
+                                                                best_params,
+                                                                list(selected_features),
+                                                                len(selected_features)
+                                                                ]
+                model_line+=1
                     
 
             
@@ -330,7 +368,7 @@ for NNB_radius in list_NNB_radius:
             print ('Execution time in seconds: ' + str (executionTime)) 
             
             models_scan.to_excel(path_dir_output+"results.xlsx")  
-            df_proteins.to_csv(path_dir_output+"analysis_proteins_NNB_"+str(NNB_radius)+"_N5_"+str(N5_radius)+".csv")
+            
             index_line+=len(name_models)
             
                         
