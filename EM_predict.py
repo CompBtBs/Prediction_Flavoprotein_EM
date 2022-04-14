@@ -35,38 +35,39 @@ from utils import RHCF,feature_selected,RemoveOutliar
 warnings.filterwarnings('ignore')
 
 # In[5]: scelta dei modelli
-name_models=["LR","KNR"]
-models_with_scaling=["LR","KNR"]              #modelli a cui applicare lo scaling
-#models_with_ro=[]
-models_with_fs=["LR","KNR"]                   #modelli a cui applicare la feature selection
+name_models=["LR","KNR","GPR","SVR","RF","XGB"]
+models_with_scaling=["LR","KNR","GPR","SVR"]              #modelli a cui applicare lo scaling
+models_with_fs=["LR","KNR","GPR","SVR"]                   #modelli a cui applicare la feature selection
 select_features=[]#feature_selected()
 filter_proteins=True
 ############
 n_jobs=4                      #number of processes in parallel
 path_inputs="dataset_features/"
+name_output_proteins="analysis_proteins"
+name_output_result="results"
 path_dir_output="outputs/"
-list_NNB_radius=np.arange(8,13)     
+list_NNB_radius=np.arange(8,17)     
 list_N5_radius=np.arange(3,7)
 ###parameters
-n_repeat=5                      #ripetizioni dell'esperimento
+n_repeat=10                     #ripetizioni dell'esperimento
 split_tuning=5                  #number of split for hyperparameters tuning (quindi 80 e 20)
 CV=5                            #cross validation for hyperparameters tuning
 opt="neg_mean_absolute_error"   #evaluation metric for hyperparameters tuning
 covariation=0.99                #valore della correlazione
 alpha=10                        #alpha paramter for feature selection
-l1_ratio=0.75                      #
-
+l1_ratio=0.75                   #
+max_iter=1000
 ###############################################################################################
-#%
-df_data=pd.read_excel("data/final_dataset_Em_flavoproteins.xlsx")
-proteins=list(df_data[df_data["reference"]!="mancante"]["PDB ID"].values)
+#%%
+df_data=pd.read_excel("data/final_dataset_Em_flavoproteins - nuovo.xlsx",index_col=0)
+proteins=list(df_data[df_data["reference"]!="mancante"].index)
 
 # INIZIALIZZO LE STRUTTE DATI
 
 models_scan=pd.DataFrame(columns=["name_model_radius",
                                   "estimator","NNB_radius","N5_radius",
                                   "MAE_train","sd_train",
-                                  "MAE_test","sd_test","MAE_lists",
+                                  "MAE_test","sd_test",
                                   "mean_error_kfold","sd_error_kfold","RMSE","sd_RMSE","R2","Pearson","Spearman",
                                   "Mae_test_list","Error_Kfold_list","RMSE_list",
                                   "R2_test_list","Pearson_test_list","Spearman_test_list",
@@ -93,8 +94,8 @@ models_dict={"LR":[LinearRegression(),{
                     'regressor__feature_selection__estimator__alpha':[10,100],
                     'regressor__feature_selection__estimator__l1_ratio':[0.5,0.75,1],
                     'regressor__regressor__C': np.logspace(-3,3,7),
-                    'regressor__regressor__gamma': np.logspace(-3,3,7)
-                    #'regressor__epsilon': np.logspace(-1,0,2)
+                    'regressor__regressor__gamma': np.logspace(-3,3,7),
+                    #'regressor__regressor__epsilon': np.logspace(-2,0,3)
                     }],   
              'GPR':[GaussianProcessRegressor(ConstantKernel(1.0,constant_value_bounds="fixed") * RBF(1.0,length_scale_bounds="fixed")),                    
                     {
@@ -109,22 +110,20 @@ models_dict={"LR":[LinearRegression(),{
                    {
                     'regressor__regressor__n_estimators': [100,150,200],
                     'regressor__regressor__max_features': ['auto', 'sqrt','log2'],
-                    'regressor__regressor__max_depth': [3, 4, 5]
+                    'regressor__regressor__max_depth': [3,4, 5]
                     }],
              "XGB":[XGBRegressor(),
                     {
-                    #"regressor__regressor__learning_rate" : [0.01,0.1,0.2,0.4],
+                    "regressor__regressor__learning_rate" : [0.01,0.1,0.2,0.4],
                     "regressor__regressor__max_depth" : [3,4,5],
-                    #"regressor__regressor__min_child_weight" : [1,5,10],
+                    "regressor__regressor__min_child_weight" : [1,5,10],
                     "regressor__regressor__n_estimators" : [100,150,200]
                     }]
              } 
-
-
 dict_proteins=dict()
 # In[]:
 #inizializzo i selettori
-en=ElasticNet(max_iter=1000,alpha=alpha,l1_ratio=l1_ratio)
+en=ElasticNet(max_iter=max_iter,alpha=alpha,l1_ratio=l1_ratio)
 estimator_feature=SelectFromModel(en)
 imp = SimpleImputer(missing_values=np.nan,strategy="mean")
 #imp = IterativeImputer(missing_values=np.nan)
@@ -140,16 +139,17 @@ for NNB_radius in list_NNB_radius:
             
             # Upload dataset
             df_pmOrig=pd.read_excel(path_inputs+file_name,sheet_name="Sheet1",index_col=0)
+            df_pmOrig=df_pmOrig.set_index("PDB ID")
             if filter_proteins:
-                df_data=df_data.loc[df_data["PDB ID"].isin(proteins) ]
-                df_pmOrig=df_pmOrig.loc[df_pmOrig["PDB ID"].isin(proteins) ]
-            df_pm=df_pmOrig.copy()#drop_duplicates()
-
+                df_data2=df_data.loc[df_data.index.isin(proteins) ]
+                df_pmOrig=df_pmOrig.loc[df_pmOrig.index.isin(proteins) ]
+            df_pm=df_pmOrig.copy()#.drop_duplicates()
+            df_pm["Em"]=df_data2["Em"].copy()
 
             for estimator in name_models:
                 dict_proteins[estimator]=dict()
                 cont=0
-                for key in df_pm["PDB ID"].values:
+                for key in df_pm.index:
                     dict_proteins[estimator][key+"_"+str(cont)]=0
                     cont+=1
                     
@@ -172,7 +172,7 @@ for NNB_radius in list_NNB_radius:
                 df_proteins=pd.DataFrame(index=labels)
 
 
-            DATA_dict={name_model:{"mae_train":[],"mae_test":[],"mae_lists":[],"RMSE":[],"R2":[],"Pearson":[],"Spearman":[],"EOKfold":[]} for name_model in name_models}
+            DATA_dict={name_model:{"mae_train":[],"mae_test":[],"RMSE":[],"R2":[],"Pearson":[],"Spearman":[],"EOKfold":[]} for name_model in name_models}
 
             startTime = time.time ()
             
@@ -244,7 +244,6 @@ for NNB_radius in list_NNB_radius:
                         DATA_dict[estimator]["EOKfold"].append(np.abs(optEstimator.best_score_))
                         DATA_dict[estimator]["mae_train"].append(mean_absolute_error(optEstimator.predict(X_train2), y_train))
                         DATA_dict[estimator]["mae_test"].append(mean_absolute_error(optEstimator.predict(X_test2), y_test))
-                        DATA_dict[estimator]["mae_lists"]=dict_proteins[estimator]
                         DATA_dict[estimator]["RMSE"].append(np.sqrt(mean_squared_error(optEstimator.predict(X_test2), y_test)))
                         DATA_dict[estimator]["R2"].append(r2_score(y_test, optEstimator.predict(X_test2)))
                         DATA_dict[estimator]["Pearson"].append(pearsonr(y_test, optEstimator.predict(X_test2))[0])
@@ -256,26 +255,29 @@ for NNB_radius in list_NNB_radius:
                             
             #ogni proteina è visita esattamente n_repeat volte!!!
             for label in labels:
-                dict_proteins[estimator][label]=dict_proteins[estimator][label]/n_repeat
-            
-            df_proteins[estimator+"_"+str(NNB_radius)+"_"+str(N5_radius)]=[dict_proteins[estimator][key] for key in dict_proteins[estimator].keys()]
-            if "Em" not in df_proteins.columns:
-                df_proteins.insert(loc = 0,
-                          column = 'Em',
-                          value = df_data["Em"].values)            
+                for estimator in name_models:
+                    dict_proteins[estimator][label]=dict_proteins[estimator][label]/n_repeat
+                
+            for estimator in name_models:
+                df_proteins[estimator+"_"+str(NNB_radius)+"_"+str(N5_radius)]=[dict_proteins[estimator][key] for key in dict_proteins[estimator].keys()]
+           
             if "Organism" not in df_proteins.columns:
-                df_proteins.insert(loc = 1,
+                df_proteins.insert(loc = 0,
                           column = 'Organism',
                           value = df_data["Organism "].values)
             if "Cofactor" not in df_proteins.columns:
-                df_proteins.insert(loc = 2,
+                df_proteins.insert(loc = 1,
                           column = 'Cofactor',
                           value = df_data["Cofactor"].values)
             if "reference" not in df_proteins.columns:
-                df_proteins.insert(loc = 3,
+                df_proteins.insert(loc = 2,
                           column = 'reference',
                           value = df_data["reference"].values)
-            df_proteins.to_csv(path_dir_output+"analysis_proteins.csv")
+            if "Em" not in df_proteins.columns:
+                df_proteins.insert(loc = 3,
+                          column = 'Em',
+                          value = df_data["Em"].values) 
+            df_proteins.to_csv(path_dir_output+name_output_proteins+".csv")
             model_line=0
                 
             for estimator in name_models:
@@ -289,7 +291,6 @@ for NNB_radius in list_NNB_radius:
                 #faccio lo scaling
                 if estimator in models_with_scaling:
                     X2=StandardScaler().fit(X2).transform(X2)  
-
                 #uso un modello specifico
                 pipeline=[]
                 #feature selection
@@ -309,14 +310,13 @@ for NNB_radius in list_NNB_radius:
                 
                 best_model=optEstimator.fit(X2,y)
                 best_params=best_model.best_params_
-                
-                
-                alphaTot=best_model.best_params_['regressor__feature_selection__estimator__alpha']
-                l1_ratioTot=best_model.best_params_['regressor__feature_selection__estimator__l1_ratio']
-                enTot=ElasticNet(max_iter=1000,alpha=alphaTot,l1_ratio=l1_ratioTot)
-                estimator_featureTot=SelectFromModel(enTot)
+
                 #feature selection
                 if  estimator in models_with_fs:
+                    alphaTot=best_model.best_params_['regressor__feature_selection__estimator__alpha']
+                    l1_ratioTot=best_model.best_params_['regressor__feature_selection__estimator__l1_ratio']
+                    enTot=ElasticNet(max_iter=max_iter,alpha=alphaTot,l1_ratio=l1_ratioTot)
+                    estimator_featureTot=SelectFromModel(enTot)
                     fs=estimator_featureTot.fit(X2,y)
                     
                     selection=en.fit(X2,y)     
@@ -327,13 +327,10 @@ for NNB_radius in list_NNB_radius:
                     for el,el2 in zip(df_pm.columns[features_index],C):
                         if el2==True:
                             selected_features.append(el) 
-                    X2=fs.transform(X2)
 
                 else:
                     selected_features=[]
-
-
-
+                    
                 models_scan.loc[(index_line + model_line)]=[(estimator+"_"+str(NNB_radius)+"_"+str(N5_radius)),
                                                                 estimator,
                                                                 int(NNB_radius),
@@ -342,7 +339,6 @@ for NNB_radius in list_NNB_radius:
                                                                 np.std(DATA_dict[estimator]["mae_train"]),
                                                                 np.mean(DATA_dict[estimator]["mae_test"]),
                                                                 np.std(DATA_dict[estimator]["mae_test"]),
-                                                                DATA_dict[estimator]["mae_lists"],
                                                                 np.mean(DATA_dict[estimator]["EOKfold"]),
                                                                 np.std(DATA_dict[estimator]["EOKfold"]),
                                                                 np.mean(DATA_dict[estimator]["RMSE"]),
@@ -361,13 +357,11 @@ for NNB_radius in list_NNB_radius:
                                                                 len(selected_features)
                                                                 ]
                 model_line+=1
-                    
-
             
             executionTime = (time.time () - startTime) 
             print ('Execution time in seconds: ' + str (executionTime)) 
             
-            models_scan.to_excel(path_dir_output+"results.xlsx")  
+            models_scan.to_excel(path_dir_output+name_output_result+".xlsx")  
             
             index_line+=len(name_models)
             

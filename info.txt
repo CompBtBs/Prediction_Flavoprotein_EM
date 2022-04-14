@@ -1,0 +1,6 @@
+1.18.1.2 Nostoc sp. (Anabaena sp.)  L76F  c'è potenziale ma non c'è struttura 
+1.18.1.2 Nostoc sp. (Anabaena sp.)  L78F  c'è potenziale ma non c'è struttura 
+1.18.1.2 Nostoc sp. (Anabaena sp.)  L76D  c'è potenziale ma non c'è struttura 
+1.18.1.2 Nostoc sp. (Anabaena sp.)  V136S c'è potenziale ma non c'è struttura 
+1.18.1.2 Nostoc sp. (Anabaena sp.)  L78S  c'è potenziale ma non c'è struttura 
+1.4.3.4 Bos taurus  L78S  c'è potenziale ma non c'è struttura 
