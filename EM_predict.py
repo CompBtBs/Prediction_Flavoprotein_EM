@@ -35,7 +35,7 @@ from utils import RHCF,feature_selected,RemoveOutliar
 warnings.filterwarnings('ignore')
 
 # In[5]: scelta dei modelli
-name_models=["LR","KNR","GPR","SVR","RF","XGB"]
+name_models=["LR","GPR","KNR","SVR","RF","XGB"]
 models_with_scaling=["LR","KNR","GPR","SVR"]              #modelli a cui applicare lo scaling
 models_with_fs=["LR","KNR","GPR","SVR"]                   #modelli a cui applicare la feature selection
 select_features=[]#feature_selected()
@@ -43,8 +43,8 @@ filter_proteins=True
 ############
 n_jobs=4                      #number of processes in parallel
 path_inputs="dataset_features/"
-name_output_proteins="analysis_proteins"
-name_output_result="results"
+name_output_proteins="analysis_proteins_no_5_feadtures_DS"
+name_output_result="results_no_5_feadtures_DS"
 path_dir_output="outputs/"
 list_NNB_radius=np.arange(8,17)     
 list_N5_radius=np.arange(3,7)
@@ -57,9 +57,14 @@ covariation=0.99                #valore della correlazione
 alpha=10                        #alpha paramter for feature selection
 l1_ratio=0.75                   #
 max_iter=1000
+features_todrop=['Pymol_N1-N3',
+                 'Pymol_O',
+                 'Pymol_Pi-Pistacking',
+                 'Pymol_Stackingalifatico',
+                 'Pymol_Pi Cation']
 ###############################################################################################
 #%%
-df_data=pd.read_excel("data/final_dataset_Em_flavoproteins - nuovo.xlsx",index_col=0)
+df_data=pd.read_excel("data/dataset.xlsx",index_col=0)
 proteins=list(df_data[df_data["reference"]!="mancante"].index)
 
 # INIZIALIZZO LE STRUTTE DATI
@@ -120,6 +125,7 @@ models_dict={"LR":[LinearRegression(),{
                     "regressor__regressor__n_estimators" : [100,150,200]
                     }]
              } 
+
 dict_proteins=dict()
 # In[]:
 #inizializzo i selettori
@@ -138,14 +144,13 @@ for NNB_radius in list_NNB_radius:
             print(file_name)
             
             # Upload dataset
-            df_pmOrig=pd.read_excel(path_inputs+file_name,sheet_name="Sheet1",index_col=0)
+            df_pmOrig=pd.read_excel(path_inputs+file_name,sheet_name="Sheet1",index_col=0).drop(features_todrop,axis=1)
             df_pmOrig=df_pmOrig.set_index("PDB ID")
+            
             if filter_proteins:
-                df_data2=df_data.loc[df_data.index.isin(proteins) ]
+                df_data2=df_data.loc[df_data.index.isin(proteins) ] #select on PDB present in prteins
                 df_pmOrig=df_pmOrig.loc[df_pmOrig.index.isin(proteins) ]
             df_pm=df_pmOrig.copy()#.drop_duplicates()
-            df_pm["Em"]=df_data2["Em"].copy()
-
             for estimator in name_models:
                 dict_proteins[estimator]=dict()
                 cont=0
@@ -153,7 +158,7 @@ for NNB_radius in list_NNB_radius:
                     dict_proteins[estimator][key+"_"+str(cont)]=0
                     cont+=1
                     
-            df_pm=df_pm.iloc[:,1:]
+            #df_pm=df_pm.iloc[:,1:]
 
             if len(select_features)!=0:
                 df_pm=df_pm.loc[:,select_features]
@@ -261,22 +266,10 @@ for NNB_radius in list_NNB_radius:
             for estimator in name_models:
                 df_proteins[estimator+"_"+str(NNB_radius)+"_"+str(N5_radius)]=[dict_proteins[estimator][key] for key in dict_proteins[estimator].keys()]
            
-            if "Organism" not in df_proteins.columns:
-                df_proteins.insert(loc = 0,
-                          column = 'Organism',
-                          value = df_data["Organism "].values)
-            if "Cofactor" not in df_proteins.columns:
-                df_proteins.insert(loc = 1,
-                          column = 'Cofactor',
-                          value = df_data["Cofactor"].values)
-            if "reference" not in df_proteins.columns:
-                df_proteins.insert(loc = 2,
-                          column = 'reference',
-                          value = df_data["reference"].values)
             if "Em" not in df_proteins.columns:
-                df_proteins.insert(loc = 3,
+                df_proteins.insert(loc =1,
                           column = 'Em',
-                          value = df_data["Em"].values) 
+                          value = df_pm["Em"].values) 
             df_proteins.to_csv(path_dir_output+name_output_proteins+".csv")
             model_line=0
                 

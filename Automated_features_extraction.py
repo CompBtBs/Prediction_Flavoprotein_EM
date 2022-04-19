@@ -29,8 +29,8 @@ d3to1 = {'CYS': 'C', 'ASP': 'D', 'SER': 'S', 'GLN': 'Q', 'LYS': 'K',
 
 path_dir=""
 #%% leggo il file dove sono presente le proteine da considerare
-dataset=pd.read_excel(path_dir+"data/final_dataset_Em_flavoproteins.xlsx",usecols=(0,3,4))
-features_DS=pd.read_excel(path_dir+"data/DS_Visualizer_Features.xlsx")
+dataset=pd.read_excel(path_dir+"data/dataset.xlsx",usecols=(0,3,4))
+features_DS=pd.read_excel(path_dir+"data/DS_Visualizer_Features.xlsx").drop("Unnamed: 0", axis=1)
 
 proteins_PDB=list(OrderedDict.fromkeys(dataset["PDB ID"])) #list of PDB ID used
 
@@ -42,6 +42,7 @@ table_amm=table_amm.iloc[:,1:]
 #%%ciclo for per considerare i diversi raggi rispetto a baricentro ed N5
 for NNB in list_NNB: 
     for N5 in list_N5:
+        print ("#################"+str(NNB)+"and"+str(N5)+"#################")
 #%% inizializzo il dataframe ed i nomi delle colonne: nome proteina+nome catena
         df_total=pd.DataFrame()  
         nomi=list()
