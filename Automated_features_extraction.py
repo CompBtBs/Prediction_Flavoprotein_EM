@@ -14,8 +14,8 @@ import pandas as pd
 from utils import get_baricentro,get_atoms_coord,get_covariance,inizializza_dict_amm,feature_conteggio,specific_feature
 #%% parametri di lancio
 
-list_NNB=list(np.arange(11,17))          #distanza rispetto al baricentro dell'anello isocoso
-list_N5=list(np.arange(3,7))            #distanza rispetto ad N5 dell'anello isocoso
+list_Bar=list(np.arange(8,11))          #distanza rispetto al baricentro dell'anello isocoso
+list_Ring=list(np.arange(3,7))             #distanza rispetto ad uno qualunche degli atomi dell'anello isocoso
   
 amm_names=["ALA","ARG","ASN","ASP","CYS",
           "GLN","GLU","GLY","HIS","ILE",
@@ -39,10 +39,10 @@ table_amm=pd.read_csv(path_dir+"data/tabellaAmm.txt",
 table_amm.index=[el.upper() for el in table_amm.index]
 table_amm=table_amm.iloc[:,1:]
 
-#%%ciclo for per considerare i diversi raggi rispetto a baricentro ed N5
-for NNB in list_NNB: 
-    for N5 in list_N5:
-        print ("#################"+str(NNB)+"and"+str(N5)+"#################")
+#%%ciclo for per considerare i diversi raggi rispetto a baricentro ed ring
+for bar in list_Bar: 
+    for ring in list_Ring:
+        print ("__________________"+str(bar)+"and"+str(ring)+"__________________")
 #%% inizializzo il dataframe ed i nomi delle colonne: nome proteina+nome catena
         df_total=pd.DataFrame()  
         nomi=list()
@@ -129,30 +129,30 @@ for NNB in list_NNB:
                               Cof_coord_el,
                               Cof_coords_el,
                               N5_el,
-                              NNB,
-                              N5,
+                              bar,
+                              ring,
                               dict_residues,
                               amm_names)
                   
                     #calcolo gli amminoacidi totali
-                    total=sum([dict_cont[nome] for nome in amm_names])
+                    total_bar=sum([dict_cont["Bar."+nome] for nome in amm_names])
                     total_protein=sum([dict_cont["Protein."+nome] for nome in amm_names])
-                    total_NNB=sum([dict_cont["NNB."+nome] for nome in amm_names])
+                    total_ring=sum([dict_cont["Ring."+nome] for nome in amm_names])
         
                     #queste righe sono solo per non dividere per zero dopo
-                    if total==0:
-                        total=1   
+                    if total_bar==0:
+                        total_bar=1   
                     if total_protein==0:
                         total_protein=1 
-                    if total_NNB==0:
-                        total_NNB=1 
+                    if total_ring==0:
+                        total_ring=1 
                     
                     
                     #calcolo i descrittori Pone per l'intorno dell'anello (rispetto al baricentro)
                     for col in table_amm.columns: #28+28
                         values=table_amm[col]
-                        val_feature=np.sum([values[nome]*dict_cont[nome] for nome in amm_names])
-                        dict_cont[col]=val_feature
+                        val_feature=np.sum([values[nome]*dict_cont["Bar."+nome] for nome in amm_names])
+                        dict_cont["Bar."+col]=val_feature
                         
             
                     #calcolo i descrittori per tutta la proteina
@@ -165,26 +165,26 @@ for NNB in list_NNB:
                     #calcolo i descrittori Pone per l'intorno dell'anello ( rispetto a un atomo qualunque)
                     for col in table_amm.columns: 
                         values=table_amm[col]
-                        val_feature=np.sum([values[nome]*dict_cont["NNB."+nome] for nome in amm_names])
-                        dict_cont["NNB."+col]=val_feature
+                        val_feature=np.sum([values[nome]*dict_cont["Ring."+nome] for nome in amm_names])
+                        dict_cont["Ring."+col]=val_feature
                                    
                         
                     #calcolo descrittori dell'amminoacido davanti a N5
                     if N5_nearest_res:
                         for col in table_amm.columns: #28
                             value=table_amm.loc[N5_nearest_res,col]
-                            dict_cont["N5."+col]=value
+                            dict_cont["N5_nearest."+col]=value
                     
                     #calcolo descrittori dei 3 amminoacidi più vicini a N5
                     if N5_3_nearest_res:
                         for col in table_amm.columns: #28
                             value=table_amm.loc[N5_3_nearest_res,col].sum()
-                            dict_cont["N3_amm."+col]=value        
+                            dict_cont["Around_N5."+col]=value        
                     
                     #altre feature  #alifatici, aromatici, etc...
-                    dict_cont=specific_feature(dict_cont,prefisso="",mean=True,total=total)
+                    dict_cont=specific_feature(dict_cont,prefisso="Bar.",mean=True,total=total_bar)
                     dict_cont=specific_feature(dict_cont,prefisso="Protein.",mean=True,total=total_protein)
-                    dict_cont=specific_feature(dict_cont,prefisso="NNB.",mean=True,total=total_NNB)    
+                    dict_cont=specific_feature(dict_cont,prefisso="Ring.",mean=True,total=total_bar)    
                     
                     dict_cont["PDB ID"]=name_protein
                     
@@ -221,12 +221,12 @@ for NNB in list_NNB:
         cols = df_total.columns.tolist()
         cols = cols[-7:-5] + cols[-5:] + cols[:-7]
         df_total = df_total[cols]
-        print(NNB,N5)
+        print(bar,ring)
         
         df_total=df_total.groupby("PDB ID").agg(lambda x: np.round(np.mean(x),2))
         
         dataset2=dataset.merge(features_DS, on="PDB ID")
         dataset2=dataset2.join(df_total, on="PDB ID")        
-        dataset2.to_excel(path_dir+"dataset_features/database_protein_"+str(NNB)+"_"+str(N5)+".xlsx")    
+        dataset2.to_excel(path_dir+"dataset_features/dataset_protein_"+str(bar)+"_"+str(ring)+".xlsx")    
         
 

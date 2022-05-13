@@ -11,11 +11,10 @@ import matplotlib as mtp
 import matplotlib.pyplot as plt 
 import seaborn as sns 
 
-path_dir1="G:/Altri computer/Computer_Laboratorio/"
-#path_dir1="C:/Users/df_scanM866527/Desktop/"
-
-scan_file="Models_scanchains"
-df_scan=pd.read_excel(path_dir1+"AntonioM/" + scan_file + ".xlsx")
+path_dir1="outputs/"
+output_path="outputs/scan/no_5_features_DS/"
+scan_file="results_no_5_features_DS.xlsx"
+df_scan=pd.read_excel(path_dir1+ scan_file)
 df_scan=df_scan.drop("Unnamed: 0",axis=1)
 
 df_scan["estimator"]=df_scan["name_model_radius"].apply(lambda x: x.split("_")[-3])
@@ -35,16 +34,22 @@ for estimator in estimator_list:
                 
         bwr_reversed = mtp.cm.get_cmap('bwr_r')
         
-        f, axs = plt.subplots(1, 2, figsize=(15,5))
+        f= plt.figure(figsize=(30,10))
+        
+        sns.set_theme(font="Calibri" , font_scale=3.5)
+        
         sns.heatmap(data=MAE_df_pivoted, cmap="bwr", cbar=True, cbar_kws={'label': 'MAE',"orientation": "horizontal"},
-                       annot=True,fmt=".3g", square=True,vmax=(60),vmin=(20),linewidths=0.3,ax=axs[0]).invert_yaxis()
+                       annot=True,fmt=".3g", square=True,vmax=(70),vmin=(30), linewidths=0.3,  annot_kws={"size": 40}, 
+                       ).invert_yaxis()
         
-        sns.heatmap(data=R2_df_pivoted, cmap="bwr_r", cbar=True, cbar_kws={'label': 'R2', "orientation": "horizontal"},
-                         annot=True, fmt=".3g", square=True,vmax=(1), vmin=(0.4),linewidths=0.3,ax=axs[1]).invert_yaxis()
+        # sns.heatmap(data=R2_df_pivoted, cmap="bwr_r", cbar=True, cbar_kws={'label': 'R2', "orientation": "horizontal"},
+        #                  annot=True, fmt=".3g", square=True,vmax=(1), vmin=(0.4), linewidths=0.3, annot_kws={"size": 22},
+        #                  ax=axs[1]).invert_yaxis()
         
-        plt.suptitle(estimator,fontweight ="bold") 
-        axs[0].set_title("MAE", fontweight ="bold")
-        axs[1].set_title("R2", fontweight ="bold")
-        plt.show()   
+        f.suptitle(estimator,fontweight ="bold") 
+        #axs[0].set_title("MAE", fontweight ="bold")
+        #axs[1].set_title("R2", fontweight ="bold")
+        plt.show()
+        f.savefig(output_path+"scan_"+estimator+".svg")
         
                                   

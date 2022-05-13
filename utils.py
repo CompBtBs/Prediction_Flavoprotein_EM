@@ -14,30 +14,6 @@ import numpy as np
 from numpy.linalg import norm as norm2
 from sklearn.ensemble import IsolationForest
 
-def feature_selected():
-    return [
-     "EM",
-     'pH',
-  'Oxygen_H_bond',
-  'Pi-Pi_Stacking',
-  'Stacking_Alifatico',
-  'Pi_cation',
-  'NNB.ALA',
-  'ASP',
-  'CYS',
-  'NNB.GLU',
-  'HIS',
-  'NNB.HIS',
-  'Nitrogen_around',
-  'NNB.nNats in side chain',
-  'N5.Isoelectric point',
-  'N5.log(Solub) x Flex',
-  'N3_amm.Hydrophobicity x Flex.',
-  'RESNEG',
-  '_SolventAccessibilityC2',
-  '_HydrophobicityC1',
-  '_HydrophobicityC3'        
-        ]
 
 def RemoveOutliar(X,y):
     clf = IsolationForest(random_state=0).fit(X)
@@ -127,9 +103,9 @@ def get_covariance(element,el1,el2):
 def inizializza_dict_amm(nomi_amm):
     dict_cont=dict()
     for el in nomi_amm:
-        dict_cont[el]=0
+        dict_cont["Bar."+el]=0
         dict_cont["Protein."+el]=0
-        dict_cont["NNB."+el]=0
+        dict_cont["Ring."+el]=0
     return dict_cont
 
 #%%
@@ -177,8 +153,8 @@ def feature_conteggio(dict_cont,
                       nomi_amm):
     """
     Funzione che conta gli amminoacidi:
-        1. in tutta la proteina
-        2. in un intorno dell'anello isocoso (rispetto al suo baricentro'
+        1. in tutta la catena
+        2. in un intorno dell'anello isocoso (rispetto al suo baricentro')
         3. in un intorno dell'anello isocoso (rispetto a qualunque suo atomo'
     Gli input sono:
         dict_cont: il dizionario dove salvo le feature
@@ -216,7 +192,7 @@ def feature_conteggio(dict_cont,
         #se l'atomo di un amminoacido è vicino al baricentro allora lo conteggio
         for atom in atoms:
             if norm2(atom.coord-Cof_coord_el)<min_distBaricenter:
-                dict_cont[name_residue]+=1 #basta solo che un atomo dell'amminoacido sia vicino!!!!
+                dict_cont["Bar."+name_residue]+=1 #basta solo che un atomo dell'amminoacido sia vicino!!!!
                 break
 
         #### verifico se un amminoacidi ha almeno un atomo vicino a un qualunque atomo dell'anello
@@ -224,7 +200,7 @@ def feature_conteggio(dict_cont,
         for atom in atoms:
             for el2 in Cof_coords_el:
                 if norm2(atom.coord-el2)<min_distRing:
-                    dict_cont["NNB."+name_residue]+=1
+                    dict_cont["Ring."+name_residue]+=1
                     stop_cont=1
                     break                    
             if stop_cont:

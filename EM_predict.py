@@ -29,7 +29,7 @@ from sklearn.impute import SimpleImputer
 from xgboost import XGBRegressor
 import warnings
 import time
-from utils import RHCF,feature_selected,RemoveOutliar
+from utils import RHCF,RemoveOutliar
 # In[2]:
 
 warnings.filterwarnings('ignore')
@@ -43,11 +43,11 @@ filter_proteins=True
 ############
 n_jobs=4                      #number of processes in parallel
 path_inputs="dataset_features/"
-name_output_proteins="analysis_proteins_no_5_feadtures_DS"
-name_output_result="results_no_5_feadtures_DS"
-path_dir_output="outputs/"
-list_NNB_radius=np.arange(8,17)     
-list_N5_radius=np.arange(3,7)
+name_output_proteins="analysis_proteins_no_5_features_DS_noCL"
+name_output_result="results_no_5_features_DS_noCL"
+path_dir_output="outputs/new_scans_May_2022/"
+list_Bar_radius=np.arange(8,17)     
+list_Ring_radius=np.arange(3,7)
 ###parameters
 n_repeat=10                     #ripetizioni dell'esperimento
 split_tuning=5                  #number of split for hyperparameters tuning (quindi 80 e 20)
@@ -57,11 +57,13 @@ covariation=0.99                #valore della correlazione
 alpha=10                        #alpha paramter for feature selection
 l1_ratio=0.75                   #
 max_iter=1000
-features_todrop=['Pymol_N1-N3',
-                 'Pymol_O',
-                 'Pymol_Pi-Pistacking',
-                 'Pymol_Stackingalifatico',
-                 'Pymol_Pi Cation']
+features_todrop=['N1-N3_Hbond',
+                 'O_Hbond',
+                 'Pi-Pi_Stacking',
+                 'Stacking_Alifatico',
+                 'Pi_Cation']
+
+pdb_todrop=['3D9G','3D2D','3FW8','1FCD','2VFR'] #lista di pdb da eliminare perchè presentano legami covalenti
 ###############################################################################################
 #%%
 df_data=pd.read_excel("data/dataset.xlsx",index_col=0)
@@ -70,7 +72,7 @@ proteins=list(df_data[df_data["reference"]!="mancante"].index)
 # INIZIALIZZO LE STRUTTE DATI
 
 models_scan=pd.DataFrame(columns=["name_model_radius",
-                                  "estimator","NNB_radius","N5_radius",
+                                  "estimator","bar_radius","ring_radius",
                                   "MAE_train","sd_train",
                                   "MAE_test","sd_test",
                                   "mean_error_kfold","sd_error_kfold","RMSE","sd_RMSE","R2","Pearson","Spearman",
@@ -136,16 +138,15 @@ imp = SimpleImputer(missing_values=np.nan,strategy="mean")
 df_proteins=None
 index_line=0 #index riga for model scan dataset 
 
-for NNB_radius in list_NNB_radius: 
-    for N5_radius in list_N5_radius:
+for bar_radius in list_Bar_radius: 
+    for ring_radius in list_Ring_radius:
             dict_proteins=dict()
 #%%
-            file_name="database_protein_"+str(NNB_radius)+"_"+str(N5_radius)+".xlsx"
+            file_name="dataset_protein_"+str(bar_radius)+"_"+str(ring_radius)+".xlsx"
             print(file_name)
             
             # Upload dataset
-            df_pmOrig=pd.read_excel(path_inputs+file_name,sheet_name="Sheet1",index_col=0).drop(features_todrop,axis=1)
-            df_pmOrig=df_pmOrig.set_index("PDB ID")
+            df_pmOrig=pd.read_excel(path_inputs+file_name,sheet_name="Sheet1",index_col=0).drop(features_todrop,axis=1).drop(pdb_todrop,axis=0)
             
             if filter_proteins:
                 df_data2=df_data.loc[df_data.index.isin(proteins) ] #select on PDB present in prteins
@@ -264,7 +265,7 @@ for NNB_radius in list_NNB_radius:
                     dict_proteins[estimator][label]=dict_proteins[estimator][label]/n_repeat
                 
             for estimator in name_models:
-                df_proteins[estimator+"_"+str(NNB_radius)+"_"+str(N5_radius)]=[dict_proteins[estimator][key] for key in dict_proteins[estimator].keys()]
+                df_proteins[estimator+"_"+str(bar_radius)+"_"+str(ring_radius)]=[dict_proteins[estimator][key] for key in dict_proteins[estimator].keys()]
            
             if "Em" not in df_proteins.columns:
                 df_proteins.insert(loc =1,
@@ -324,10 +325,10 @@ for NNB_radius in list_NNB_radius:
                 else:
                     selected_features=[]
                     
-                models_scan.loc[(index_line + model_line)]=[(estimator+"_"+str(NNB_radius)+"_"+str(N5_radius)),
+                models_scan.loc[(index_line + model_line)]=[(estimator+"_"+str(bar_radius)+"_"+str(ring_radius)),
                                                                 estimator,
-                                                                int(NNB_radius),
-                                                                int(N5_radius),                
+                                                                int(bar_radius),
+                                                                int(ring_radius),                
                                                                 np.mean(DATA_dict[estimator]["mae_train"]),
                                                                 np.std(DATA_dict[estimator]["mae_train"]),
                                                                 np.mean(DATA_dict[estimator]["mae_test"]),
