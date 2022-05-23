@@ -13,8 +13,8 @@ from utils import get_baricentro,get_atoms_coord
 from numpy.linalg import norm as norm2
 
 
-def check_ligand(name_protein, chain, Cof_coords_el):
-         ligands=[el for el in chain.get_residues() if el.resname not in amm_names and el!="FAD" and el!="FMN"]
+def check_ligand_ring(name_protein, chain, Cof_coords_el):
+         ligands=[el for el in chain.get_residues() if el.resname not in amm_names and el not in res_list_acc]
          list_ligands=[]
          for ligand in ligands:
              name_ligand=ligand.resname
@@ -22,11 +22,26 @@ def check_ligand(name_protein, chain, Cof_coords_el):
                  atoms=[atom for atom in ligand.get_atoms()]
                  for atom in atoms:
                      for coord in Cof_coords_el:
-                        if norm2(atom.coord-coord)<min_dist:
+                        if norm2(atom.coord-coord)<min_dist_ring:
                             list_ligands.append(name_ligand)
-                            dict_pdb_ligand[name_protein]=list_ligands
-                            return dict_pdb_ligand
-         return dict_pdb_ligand
+                            dict_pdb_ligand_ring_atoms[name_protein]=list_ligands
+                            return dict_pdb_ligand_ring_atoms
+         return dict_pdb_ligand_ring_atoms
+
+        
+def check_ligand_bar(name_protein, chain, Cof_coords_el):
+         ligands=[el for el in chain.get_residues() if el.resname not in amm_names and el!="FAD" and el!="FMN"]
+         list_ligands=[]
+         for ligand in ligands:
+             name_ligand=ligand.resname
+             if name_ligand != "HOH" and name_ligand != "FAD" and len(name_ligand) != 2:
+                 atoms=[atom for atom in ligand.get_atoms()]
+                 for atom in atoms:
+                        if norm2(atom.coord-Cof_coord_el)<min_dist_bar:
+                            list_ligands.append(name_ligand)
+                            dict_pdb_ligand_ring_atoms[name_protein]=list_ligands
+                            return dict_pdb_ligand_bar
+         return dict_pdb_ligand_bar
             
 
 amm_names=["ALA","ARG","ASN","ASP","CYS",
@@ -34,9 +49,12 @@ amm_names=["ALA","ARG","ASN","ASP","CYS",
           "LEU","LYS","MET","PHE","PRO",
           "SER","THR","TRP","TYR","VAL"]  #nomi amminoacidi considerati
 
+res_list_acc=["FAD","FMN","NAD","HOH"]
 path_dir=""
-min_dist=4
-dict_pdb_ligand=dict()
+min_dist_ring=4
+min_dist_bar=12
+dict_pdb_ligand_ring_atoms=dict()
+dict_pdb_ligand_bar=dict()
 #%% leggo il file dove sono presente le proteine da considerare
 dataset=pd.read_excel(path_dir+"data/dataset.xlsx",usecols=(0,3,4))
 features_DS=pd.read_excel(path_dir+"data/DS_Visualizer_Features.xlsx").drop("Unnamed: 0", axis=1)
@@ -87,7 +105,11 @@ for name_protein in proteins_PDB:
                             ind2=40
                             
                         Cof_coords_el=get_atoms_coord(residue,ind1,ind2)
-                        dict_pdb_ligand=check_ligand(name_protein, chain, Cof_coords_el)
+                        Cof_coord_el=get_baricentro(residue,ind1,ind2)
+                        
+                        dict_pdb_ligand_ring_atoms=check_ligand_ring(name_protein, chain, Cof_coords_el)
+                        #dict_pdb_ligand_bar=check_ligand_bar(name_protein, chain, Cof_coord_el)
+                        
                             
                             
                             

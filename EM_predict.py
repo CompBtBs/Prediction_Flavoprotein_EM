@@ -35,19 +35,19 @@ from utils import RHCF,RemoveOutliar
 warnings.filterwarnings('ignore')
 
 # In[5]: scelta dei modelli
-name_models=["LR","GPR","KNR","SVR","RF","XGB"]
-models_with_scaling=["LR","KNR","GPR","SVR"]              #modelli a cui applicare lo scaling
-models_with_fs=["LR","KNR","GPR","SVR"]                   #modelli a cui applicare la feature selection
+name_models=["LR"]#,"GPR","KNR","SVR","RF","XGB"]
+models_with_scaling=["LR"]              #modelli a cui applicare lo scaling
+models_with_fs=["LR"]                   #modelli a cui applicare la feature selection
 select_features=[]#feature_selected()
 filter_proteins=True
 ############
 n_jobs=4                      #number of processes in parallel
 path_inputs="dataset_features/"
-name_output_proteins="analysis_proteins_no_5_features_DS_noCL"
-name_output_result="results_no_5_features_DS_noCL"
-path_dir_output="outputs/new_scans_May_2022/"
+name_output_proteins="analysis_LR_ring_radius_3"
+name_output_result="results_LR_ring_radius_3"
+path_dir_output="outputs/"
 list_Bar_radius=np.arange(8,17)     
-list_Ring_radius=np.arange(3,7)
+list_Ring_radius=np.arange(3,4)
 ###parameters
 n_repeat=10                     #ripetizioni dell'esperimento
 split_tuning=5                  #number of split for hyperparameters tuning (quindi 80 e 20)
@@ -149,8 +149,8 @@ for bar_radius in list_Bar_radius:
             df_pmOrig=pd.read_excel(path_inputs+file_name,sheet_name="Sheet1",index_col=0).drop(features_todrop,axis=1).drop(pdb_todrop,axis=0)
             
             if filter_proteins:
-                df_data2=df_data.loc[df_data.index.isin(proteins) ] #select on PDB present in prteins
                 df_pmOrig=df_pmOrig.loc[df_pmOrig.index.isin(proteins) ]
+            df_pmOrig=df_pmOrig.reset_index().drop_duplicates().set_index("PDB ID")
             df_pm=df_pmOrig.copy()#.drop_duplicates()
             for estimator in name_models:
                 dict_proteins[estimator]=dict()
@@ -314,7 +314,7 @@ for bar_radius in list_Bar_radius:
                     fs=estimator_featureTot.fit(X2,y)
                     
                     selection=en.fit(X2,y)     
-                    C=np.array(np.abs(selection.coef_)>0)
+                    C=np.array(np.abs(fs.estimator_.coef_)>0)
                     selected_features=[]
                     
                     features_index=[1+el for el in remove_hcf.to_keep]
