@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+prova.txt
 boxplot.ipynb
 Mann-Whitney_analysis.py
 table_features.xlsx
