@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+boxplot.ipynb
+Mann-Whitney_analysis.py
+table_features.xlsx
 desktop.ini
 dataset_features/desktop.ini
 data/desktop.ini
@@ -13,9 +16,7 @@ OLD/*
 other_data/*
 Supplementary Methods.gdoc
 Additional File.xlsx 
-boxplot.ipynb
-Mann-Whitney_analysis.py
-table_features.xlsx
+
 
 
 # C extensions
