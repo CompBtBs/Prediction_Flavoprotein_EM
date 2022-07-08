@@ -1,11 +1,6 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Tue Mar 29 14:18:52 2022
 
-@author: anton
-"""
 
-### Importo le librerie
 
 # In[]:
 from scipy.stats import pearsonr,spearmanr
@@ -30,52 +25,48 @@ from xgboost import XGBRegressor
 import warnings
 import time
 from utils import RHCF,RemoveOutliar
+
 # In[2]:
 
 warnings.filterwarnings('ignore')
 
-# In[5]: scelta dei modelli
-name_models=["LR"]#,"GPR","KNR","SVR","RF","XGB"]
-models_with_scaling=["LR"]              #modelli a cui applicare lo scaling
-models_with_fs=["LR"]                   #modelli a cui applicare la feature selection
+# In[5]: models
+name_models=["LR","GPR","KNR","SVR","RF","XGB"]
+models_with_scaling=["LR","GPR","KNR","SVR"]    
+models_with_fs=["LR","GPR","KNR","SVR"]         
 select_features=[]#feature_selected()
 filter_proteins=True
 ############
 n_jobs=4                      #number of processes in parallel
 path_inputs="dataset_features/"
-name_output_proteins="analysis_LR_ring_radius_3"
-name_output_result="results_LR_ring_radius_3"
+name_output_proteins="analysis_dataset"
+name_output_result="results_dataset"
 path_dir_output="outputs/"
 list_Bar_radius=np.arange(8,17)     
-list_Ring_radius=np.arange(3,4)
+list_Ring_radius=np.arange(3,7)
+
 ###parameters
 n_repeat=10                     #ripetizioni dell'esperimento
 split_tuning=5                  #number of split for hyperparameters tuning (quindi 80 e 20)
 CV=5                            #cross validation for hyperparameters tuning
 opt="neg_mean_absolute_error"   #evaluation metric for hyperparameters tuning
-covariation=0.99                #valore della correlazione
+covariation=0.99                #covariance threshold
 alpha=10                        #alpha paramter for feature selection
 l1_ratio=0.75                   #
 max_iter=1000
-features_todrop=['N1-N3_Hbond',
-                 'O_Hbond',
-                 'Pi-Pi_Stacking',
-                 'Stacking_Alifatico',
-                 'Pi_Cation']
 
-pdb_todrop=['3D9G','3D2D','3FW8','1FCD','2VFR'] #lista di pdb da eliminare perchè presentano legami covalenti
 ###############################################################################################
 #%%
 df_data=pd.read_excel("data/dataset.xlsx",index_col=0)
-proteins=list(df_data[df_data["reference"]!="mancante"].index)
+proteins=list(df_data.index)
 
-# INIZIALIZZO LE STRUTTE DATI
 
 models_scan=pd.DataFrame(columns=["name_model_radius",
                                   "estimator","bar_radius","ring_radius",
                                   "MAE_train","sd_train",
                                   "MAE_test","sd_test",
-                                  "mean_error_kfold","sd_error_kfold","RMSE","sd_RMSE","R2","Pearson","Spearman",
+                                  "mean_error_kfold","sd_error_kfold","RMSE","sd_RMSE","R2","sd_R2",
+                                  "Pearson","sd_Pearson","Spearman","sd_Spearman",
                                   "Mae_test_list","Error_Kfold_list","RMSE_list",
                                   "R2_test_list","Pearson_test_list","Spearman_test_list",
                                   "Best_params",
@@ -101,8 +92,7 @@ models_dict={"LR":[LinearRegression(),{
                     'regressor__feature_selection__estimator__alpha':[10,100],
                     'regressor__feature_selection__estimator__l1_ratio':[0.5,0.75,1],
                     'regressor__regressor__C': np.logspace(-3,3,7),
-                    'regressor__regressor__gamma': np.logspace(-3,3,7),
-                    #'regressor__regressor__epsilon': np.logspace(-2,0,3)
+                    'regressor__regressor__gamma': np.logspace(-3,3,7)
                     }],   
              'GPR':[GaussianProcessRegressor(ConstantKernel(1.0,constant_value_bounds="fixed") * RBF(1.0,length_scale_bounds="fixed")),                    
                     {
@@ -130,13 +120,11 @@ models_dict={"LR":[LinearRegression(),{
 
 dict_proteins=dict()
 # In[]:
-#inizializzo i selettori
 en=ElasticNet(max_iter=max_iter,alpha=alpha,l1_ratio=l1_ratio)
 estimator_feature=SelectFromModel(en)
 imp = SimpleImputer(missing_values=np.nan,strategy="mean")
-#imp = IterativeImputer(missing_values=np.nan)
 df_proteins=None
-index_line=0 #index riga for model scan dataset 
+index_line=0 #index rows
 
 for bar_radius in list_Bar_radius: 
     for ring_radius in list_Ring_radius:
@@ -146,12 +134,8 @@ for bar_radius in list_Bar_radius:
             print(file_name)
             
             # Upload dataset
-            df_pmOrig=pd.read_excel(path_inputs+file_name,sheet_name="Sheet1",index_col=0).drop(features_todrop,axis=1).drop(pdb_todrop,axis=0)
-            
-            if filter_proteins:
-                df_pmOrig=df_pmOrig.loc[df_pmOrig.index.isin(proteins) ]
-            df_pmOrig=df_pmOrig.reset_index().drop_duplicates().set_index("PDB ID")
-            df_pm=df_pmOrig.copy()#.drop_duplicates()
+            df_pmOrig=pd.read_excel(path_inputs+file_name,sheet_name="Sheet1",index_col=0).set_index("PDB ID") 
+            df_pm=df_pmOrig.copy()
             for estimator in name_models:
                 dict_proteins[estimator]=dict()
                 cont=0
@@ -159,8 +143,6 @@ for bar_radius in list_Bar_radius:
                     dict_proteins[estimator][key+"_"+str(cont)]=0
                     cont+=1
                     
-            #df_pm=df_pm.iloc[:,1:]
-
             if len(select_features)!=0:
                 df_pm=df_pm.loc[:,select_features]
 
@@ -184,10 +166,8 @@ for bar_radius in list_Bar_radius:
             
             i=0
             
-            for j in range(n_repeat):
-                #ripeto la neste n volte ma così facendo tutte le proteine vengono visitate lo stesso numero di volte
+            for j in range(n_repeat):               
                 kfold=KFold(n_splits=split_tuning, random_state=j, shuffle=True)
-                #eseguo una nested 
                 
                 for train_index, test_index  in kfold.split(X):
                     print("Split_train_test:",i)
@@ -217,16 +197,6 @@ for bar_radius in list_Bar_radius:
                             sc=StandardScaler().fit(X_train2)
                             X_train2=sc.transform(X_train2)
                             X_test2=sc.transform(X_test2)
-                        # #rimuovo gli outliar
-                        # if estimator in models_with_ro:
-                        #     clf = IsolationForest(random_state=0).fit(X_train2)
-                        #     y_train=y_train[clf.predict(X_train2)==1]  
-                        #     X_train2=X_train2[clf.predict(X_train2)==1,:]                  
-                        #faccio feature selection
-                        # if  estimator in models_with_fs:
-                        #     fs=estimator_feature.fit(X_train2,y_train)
-                        #     X_train2=fs.transform(X_train2)
-                        #     X_test2=fs.transform(X_test2)
     
                         pipeline=[]    
                         #feature selection
@@ -246,7 +216,6 @@ for bar_radius in list_Bar_radius:
                                                     )
                                                     
                         _= optEstimator.fit(X_train2, y_train)
-                        #print(optEstimator.best_estimator_.get_params())
                         DATA_dict[estimator]["EOKfold"].append(np.abs(optEstimator.best_score_))
                         DATA_dict[estimator]["mae_train"].append(mean_absolute_error(optEstimator.predict(X_train2), y_train))
                         DATA_dict[estimator]["mae_test"].append(mean_absolute_error(optEstimator.predict(X_test2), y_test))
@@ -259,7 +228,7 @@ for bar_radius in list_Bar_radius:
                         for label,value in zip(labels_test,values):
                             dict_proteins[estimator][label]+=value
                             
-            #ogni proteina è visita esattamente n_repeat volte!!!
+            
             for label in labels:
                 for estimator in name_models:
                     dict_proteins[estimator][label]=dict_proteins[estimator][label]/n_repeat
@@ -271,21 +240,21 @@ for bar_radius in list_Bar_radius:
                 df_proteins.insert(loc =1,
                           column = 'Em',
                           value = df_pm["Em"].values) 
-            df_proteins.to_csv(path_dir_output+name_output_proteins+".csv")
+            #df_proteins.to_csv(path_dir_output+name_output_proteins+".csv")
             model_line=0
                 
             for estimator in name_models:
                 X2=X.copy()
-                #faccio il fill di ph
+                #ph
                 fillph=imp.fit(X2)
                 X2=fillph.transform(X2)
-                #tolgo le feature correlate
+                #remove correlated feature
                 remove_hcf=RHCF(covariation=covariation).fit(X2)
                 X2=remove_hcf.transform(X2)
-                #faccio lo scaling
+                #scaling
                 if estimator in models_with_scaling:
                     X2=StandardScaler().fit(X2).transform(X2)  
-                #uso un modello specifico
+                
                 pipeline=[]
                 #feature selection
                 if  estimator in models_with_fs:
@@ -313,7 +282,6 @@ for bar_radius in list_Bar_radius:
                     estimator_featureTot=SelectFromModel(enTot)
                     fs=estimator_featureTot.fit(X2,y)
                     
-                    selection=en.fit(X2,y)     
                     C=np.array(np.abs(fs.estimator_.coef_)>0)
                     selected_features=[]
                     
@@ -338,8 +306,11 @@ for bar_radius in list_Bar_radius:
                                                                 np.mean(DATA_dict[estimator]["RMSE"]),
                                                                 np.std(DATA_dict[estimator]["RMSE"]),
                                                                 np.mean(DATA_dict[estimator]["R2"]),
+                                                                np.std(DATA_dict[estimator]["R2"]),
                                                                 np.mean(DATA_dict[estimator]["Pearson"]),
+                                                                np.std(DATA_dict[estimator]["Pearson"]),
                                                                 np.mean(DATA_dict[estimator]["Spearman"]),
+                                                                np.std(DATA_dict[estimator]["Spearman"]),
                                                                 list(DATA_dict[estimator]["mae_test"]),
                                                                 list(DATA_dict[estimator]["EOKfold"]),
                                                                 list(DATA_dict[estimator]["RMSE"]),

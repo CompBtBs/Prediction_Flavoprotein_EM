@@ -122,6 +122,8 @@ def specific_feature(dict_cont,prefisso="",mean=True,total=None):
     apolari=["ALA","PHE","GLY","ILE","LEU","MET","PRO","TRP","VAL"]
     polari=["ASP","GLU","SER","THR","CYS","TYR"]
     aromatici=["TYR","TRP","PHE"]
+
+  
     
     if prefisso!="":
         apolari=[prefisso+el for el in apolari]
@@ -147,7 +149,7 @@ def feature_conteggio(dict_cont,
                       Cof_coord_el,
                       Cof_coords_el,
                       N5_el,
-                      min_distBaricenter,
+                      min_distBarycenter,
                       min_distRing,
                       dict_residues,
                       nomi_amm):
@@ -162,7 +164,7 @@ def feature_conteggio(dict_cont,
         Cof_coord_el: coordinate del baricentro dell'anello isocoso
         Cof_coords_el: coordinate degli atomi dell'anello isocoso
         N5_el: coordinate di N5 dell'anello isocoso
-        min_distBaricenter: distanza minima dal baricentro
+        min_distBarycenter: distanza minima dal baricentro
         min_distRing: distanza minima da un qualunque atomo dell'anello isocoso
         dict_residues: dizionario dei residui (identificativo e nome)
         nomi_amm: lista degli amminoacidi
@@ -191,7 +193,7 @@ def feature_conteggio(dict_cont,
 
         #se l'atomo di un amminoacido è vicino al baricentro allora lo conteggio
         for atom in atoms:
-            if norm2(atom.coord-Cof_coord_el)<min_distBaricenter:
+            if norm2(atom.coord-Cof_coord_el)<min_distBarycenter:
                 dict_cont["Bar."+name_residue]+=1 #basta solo che un atomo dell'amminoacido sia vicino!!!!
                 break
 

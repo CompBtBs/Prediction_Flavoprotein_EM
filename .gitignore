@@ -9,6 +9,10 @@ data/desktop.ini
 data/dataset.gsheet
 data/PDB_files
 refs/desktop.ini
+OLD/*
+other_data/*
+Supplementary Methods.gdoc
+Additional File.xlsx 
 
 # C extensions
 *.so

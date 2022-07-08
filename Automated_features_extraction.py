@@ -5,7 +5,7 @@ Created on Wed Apr  6 10:56:30 2022
 @author: anton
 """
 
-#%% librerie Python
+#%% libraries
 from collections import OrderedDict
 from Bio.PDB import PDBList,PDBParser
 from PyBioMed.PyProtein import CTD
@@ -14,14 +14,15 @@ import pandas as pd
 from utils import get_baricentro,get_atoms_coord,get_covariance,inizializza_dict_amm,feature_conteggio,specific_feature
 #%% parametri di lancio
 
-list_Bar=list(np.arange(8,11))          #distanza rispetto al baricentro dell'anello isocoso
-list_Ring=list(np.arange(3,7))             #distanza rispetto ad uno qualunche degli atomi dell'anello isocoso
+list_Bar=list(np.arange(8,17))          #distanza rispetto al baricentro dell'anello isocoso
+list_Ring=list(np.arange(3,7))          #distanza rispetto ad uno qualunche degli atomi dell'anello isocoso
   
 amm_names=["ALA","ARG","ASN","ASP","CYS",
           "GLN","GLU","GLY","HIS","ILE",
           "LEU","LYS","MET","PHE","PRO",
-          "SER","THR","TRP","TYR","VAL"]  #nomi amminoacidi considerati
- # You can use a dict to convert three letter code to one letter code
+          "SER","THR","TRP","TYR","VAL"]  #amminoacids
+          
+# You can use a dict to convert three letter code to one letter code
 d3to1 = {'CYS': 'C', 'ASP': 'D', 'SER': 'S', 'GLN': 'Q', 'LYS': 'K',
 'ILE': 'I', 'PRO': 'P', 'THR': 'T', 'PHE': 'F', 'ASN': 'N', 
 'GLY': 'G', 'HIS': 'H', 'LEU': 'L', 'ARG': 'R', 'TRP': 'W', 
@@ -30,11 +31,9 @@ d3to1 = {'CYS': 'C', 'ASP': 'D', 'SER': 'S', 'GLN': 'Q', 'LYS': 'K',
 path_dir=""
 #%% leggo il file dove sono presente le proteine da considerare
 dataset=pd.read_excel(path_dir+"data/dataset.xlsx",usecols=(0,3,4))
-features_DS=pd.read_excel(path_dir+"data/DS_Visualizer_Features.xlsx").drop("Unnamed: 0", axis=1)
-
 proteins_PDB=list(OrderedDict.fromkeys(dataset["PDB ID"])) #list of PDB ID used
 
-table_amm=pd.read_csv(path_dir+"data/tabellaAmm.txt",
+table_amm=pd.read_csv(path_dir+"data/tableAmm.txt",
                       sep="\t",index_col=1)#,header=None)#.reset_index()
 table_amm.index=[el.upper() for el in table_amm.index]
 table_amm=table_amm.iloc[:,1:]
@@ -43,6 +42,7 @@ table_amm=table_amm.iloc[:,1:]
 for bar in list_Bar: 
     for ring in list_Ring:
         print ("__________________"+str(bar)+"and"+str(ring)+"__________________")
+        
 #%% inizializzo il dataframe ed i nomi delle colonne: nome proteina+nome catena
         df_total=pd.DataFrame()  
         nomi=list()
@@ -67,7 +67,6 @@ for bar in list_Bar:
             N5_coord=dict()       #coordinate di N5 del cofattore
             
             #% start for cicle      
-        
             for model in structure:
                 #header
                 header=structure.header        
@@ -147,7 +146,6 @@ for bar in list_Bar:
                     if total_ring==0:
                         total_ring=1 
                     
-                    
                     #calcolo i descrittori Pone per l'intorno dell'anello (rispetto al baricentro)
                     for col in table_amm.columns: #28+28
                         values=table_amm[col]
@@ -200,17 +198,13 @@ for bar in list_Bar:
                     
                     #esegue il merge di due dizionari che in questo caso sono quello relativo alle features da codice e le features di PyBioMed
                     dict_cont={**dict_cont,**protein_descriptor}
-        
-        
-        
-                    #%%           
+          
                     ###fine calcolo features!!!
                     df=pd.DataFrame.from_dict(dict_cont, orient ='index')
                     
                     #aggiorno il df totale!!!
                     df_total=pd.concat([df_total,df],axis=1)
         
-            
             
     #%% fine ciclo for su tutte le proteine considerate
         df_total=df_total.fillna(0)
@@ -219,14 +213,12 @@ for bar in list_Bar:
         df_total=df_total.transpose()
         
         cols = df_total.columns.tolist()
-        cols = cols[-7:-5] + cols[-5:] + cols[:-7]
         df_total = df_total[cols]
         print(bar,ring)
         
         df_total=df_total.groupby("PDB ID").agg(lambda x: np.round(np.mean(x),2))
         
-        dataset2=dataset.merge(features_DS, on="PDB ID")
-        dataset2=dataset2.join(df_total, on="PDB ID")        
+        dataset2=dataset.join(df_total, on="PDB ID")        
         dataset2.to_excel(path_dir+"dataset_features/dataset_protein_"+str(bar)+"_"+str(ring)+".xlsx")    
         
 
