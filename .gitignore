@@ -147,3 +147,6 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+#intro_paper_old
+intro_paper.png
