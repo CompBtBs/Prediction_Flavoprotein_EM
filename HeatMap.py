@@ -2,7 +2,7 @@
 """
 Created on Mon Feb  7 20:09:58 2022
 
-@author: anton
+@author: Tony M. 
 """
 
 import pandas as pd 
@@ -14,9 +14,15 @@ import seaborn as sns
 
 
 path_dir1="outputs/"
-output_path="figure/scan/"
-scan_file="results_dataset_luglio.xlsx"
+output_path="paper figures/"
+
+scan_file="results_dataset.xlsx"
+
 df_scan=pd.read_excel(path_dir1+ scan_file)
+
+#choose the statistical metric to use 
+stat_metr= "R2" # or R2 
+
 if "Unnamed: 0" in df_scan.columns:
     df_scan=df_scan.drop("Unnamed: 0",axis=1)
 
@@ -49,20 +55,22 @@ for estimator in estimator_list:
             cbar=True
         else:
             cbar=False
-            
-        # sns.heatmap(data=MAE_df_pivoted, cmap="bwr", cbar=cbar, cbar_ax=None if estimator!="XGB" else cbar_ax,               
-        #             cbar_kws={'label': 'MAE',"orientation": "horizontal"},
-        #                 annot=True,fmt=".3g", square=True,vmax=(70),vmin=(30), linewidths=0.3,  annot_kws={"size": 42},
-        #                 ax=dataset_dict[estimator][0]).invert_yaxis()
         
-        sns.heatmap(data=R2_df_pivoted, cmap="bwr_r", cbar=cbar, cbar_ax=None if estimator!="XGB" else cbar_ax,
-                        cbar_kws={'label': 'R2',"orientation": "horizontal"},
-                          annot=True, fmt=".3g", square=True, vmax=(0.9), vmin=(0.4), linewidths=0.3, annot_kws={"size": 42},
-                          ax=dataset_dict[estimator][0]).invert_yaxis()
+        if stat_metr == "MAE":   
+            sns.heatmap(data=MAE_df_pivoted, cmap="bwr", cbar=cbar, cbar_ax=None if estimator!="XGB" else cbar_ax,               
+                        cbar_kws={'label': 'MAE',"orientation": "horizontal"},
+                            annot=True,fmt=".3g", square=True,vmax=(70),vmin=(30), linewidths=0.3,  annot_kws={"size": 42},
+                            ax=dataset_dict[estimator][0]).invert_yaxis()
+        else: 
+            sns.heatmap(data=R2_df_pivoted, cmap="bwr_r", cbar=cbar, cbar_ax=None if estimator!="XGB" else cbar_ax,
+                            cbar_kws={'label': 'R2',"orientation": "horizontal"},
+                              annot=True, fmt=".3g", square=True, vmax=(0.9), vmin=(0.4), linewidths=0.3, annot_kws={"size": 42},
+                              ax=dataset_dict[estimator][0]).invert_yaxis()
         
         dataset_dict[estimator][0].set_title(estimator,fontweight ="bold",fontsize=42)
-        
-       # dataset_dict[estimator][0].set(xlabel=None,ylabel=None)
+#%%  cell to personalize heatmap 
+       
+        # dataset_dict[estimator][0].set(xlabel=None,ylabel=None)
         
         # if estimator in ["XGB","GPR","KNR"]:
         #     dataset_dict[estimator][0].get_yaxis().set_visible(False)
@@ -71,8 +79,10 @@ for estimator in estimator_list:
         #     dataset_dict[estimator][0].get_xaxis().set_visible(False)
         
 #f.colorbar(im,shrink=0.8,ax=axs.ravel().tolist(),location="bottom")
+
+#%%
 plt.show()
-f.savefig(output_path+"heatmap_R2.svg")
+f.savefig(output_path + "heatmap_" + stat_metr + ".svg")
         
         
         

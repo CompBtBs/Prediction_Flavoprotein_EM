@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 
 
-
 # In[]:
 from scipy.stats import pearsonr,spearmanr
 import pandas as pd
@@ -31,36 +30,37 @@ from utils import RHCF,RemoveOutliar
 warnings.filterwarnings('ignore')
 
 # In[5]: models
-name_models=["LR","GPR","KNR","SVR","RF","XGB"]
-models_with_scaling=["LR","GPR","KNR","SVR"]    
-models_with_fs=["LR","GPR","KNR","SVR"]         
-select_features=[]#feature_selected()
-filter_proteins=True
+name_models=["LR","GPR","KNR","SVR","RF","XGB"] #list of models to test
+models_with_scaling=["LR","GPR","KNR","SVR"]    #list of models with features scaling (StandardScaler)
+models_with_fs=["LR","GPR","KNR","SVR"]         #list of models with features selection      
+select_features=[]#feature_selected()           #eventually subset of features to use 
 ############
-n_jobs=4                      #number of processes in parallel
-path_inputs="dataset_features/"
+n_jobs=4                                        #number of processes in parallel
+path_inputs="dataset_features/"                 
 name_output_proteins="analysis_dataset"
 name_output_result="results_dataset"
 path_dir_output="outputs/"
-list_Bar_radius=np.arange(8,17)     
+
+#range of radii combination dataset to test   
+list_Bar_radius=np.arange(8,17)                   
 list_Ring_radius=np.arange(3,7)
 
 ###parameters
-n_repeat=10                     #ripetizioni dell'esperimento
-split_tuning=5                  #number of split for hyperparameters tuning (quindi 80 e 20)
+n_repeat=10                     #output nested cross validation 
+split_tuning=5                  #inner nested corss validation used for hyperparameters tuning
 CV=5                            #cross validation for hyperparameters tuning
 opt="neg_mean_absolute_error"   #evaluation metric for hyperparameters tuning
 covariation=0.99                #covariance threshold
-alpha=10                        #alpha paramter for feature selection
-l1_ratio=0.75                   #
-max_iter=1000
+alpha=10                        #alpha parameter for features selection
+l1_ratio=0.75                   #hyperparameter for ElasticNet method (if l1_ratio = 0 the penalty is an L2 penalty; if l1_ratio = 1 it is an L1 penalty)
+max_iter=1000                   #hyperparameter for ElasticNet method 
 
 ###############################################################################################
 #%%
 df_data=pd.read_excel("data/dataset.xlsx",index_col=0)
-proteins=list(df_data.index)
+proteins=list(df_data.index) #list of PDB ID to be considered  
 
-
+#inizialize pd.dataframe which will be used to save results row by row  
 models_scan=pd.DataFrame(columns=["name_model_radius",
                                   "estimator","bar_radius","ring_radius",
                                   "MAE_train","sd_train",
@@ -73,6 +73,7 @@ models_scan=pd.DataFrame(columns=["name_model_radius",
                                   "selected_features","n_features"
                                   ])
 
+#dict for models with hyperparameters grid which will be tuned with GridSearch optimization 
 models_dict={"LR":[LinearRegression(),{
                     'regressor__feature_selection__estimator__alpha':[10,100],
                     'regressor__feature_selection__estimator__l1_ratio':[0.5,0.75,1],
@@ -120,11 +121,11 @@ models_dict={"LR":[LinearRegression(),{
 
 dict_proteins=dict()
 # In[]:
-en=ElasticNet(max_iter=max_iter,alpha=alpha,l1_ratio=l1_ratio)
+en=ElasticNet(max_iter=max_iter,alpha=alpha,l1_ratio=l1_ratio) #inizialize features selector 
 estimator_feature=SelectFromModel(en)
-imp = SimpleImputer(missing_values=np.nan,strategy="mean")
+imp = SimpleImputer(missing_values=np.nan,strategy="mean") #method used to fill missing value 
 df_proteins=None
-index_line=0 #index rows
+index_line=0 #index rows for model scan dataframe 
 
 for bar_radius in list_Bar_radius: 
     for ring_radius in list_Ring_radius:
@@ -148,8 +149,8 @@ for bar_radius in list_Bar_radius:
 
             # In[]:
             # Input/output
-            X=df_pm.iloc[:,1:].values
-            y=df_pm.iloc[:,0].values
+            X=df_pm.iloc[:,1:].values #all values except Em 
+            y=df_pm.iloc[:,0].values  #Em values 
             labels = list(dict_proteins[name_models[0]].keys())
             labels=np.array(labels)
             # In[]:
@@ -165,26 +166,28 @@ for bar_radius in list_Bar_radius:
             startTime = time.time ()
             
             i=0
-            
-            for j in range(n_repeat):               
+            #nested cross validation outer loop 
+            for j in range(n_repeat):            
                 kfold=KFold(n_splits=split_tuning, random_state=j, shuffle=True)
-                
+                #nested cross validation inner loop 
                 for train_index, test_index  in kfold.split(X):
                     print("Split_train_test:",i)
                     i=i+1
-                    #prelevo gli indici di train e test
+                    #get index for train and test set 
                     X_train=X[train_index,:]
                     y_train=y[train_index ]
                     labels_train=labels[train_index]
                     X_test=X[test_index,:]
                     y_test=y[test_index]                    
                     labels_test=labels[test_index]                         
-                    ########faccio alcune operazioni di pre-preprocessing
-                    #faccio il fill di ph
+                    
+                    ############## preprocessing operations ##############
+                    
+                    #fill missing value for pH 
                     fillph=imp.fit(X_train)
                     X_train=fillph.transform(X_train)
                     X_test=fillph.transform(X_test)
-                    #tolgo le feature correlate
+                    #remove highrelated features 
                     remove_hcf=RHCF(covariation=covariation).fit(X_train)
                     X_train=remove_hcf.transform(X_train)
                     X_test=remove_hcf.transform(X_test)                    
@@ -192,22 +195,25 @@ for bar_radius in list_Bar_radius:
                     X_test2=X_test.copy()                                
                     
                     for estimator in name_models:
-                        #eseguo lo scaling delle variabili
+                        # features scaling if needed 
                         if estimator in models_with_scaling:
                             sc=StandardScaler().fit(X_train2)
                             X_train2=sc.transform(X_train2)
                             X_test2=sc.transform(X_test2)
-    
+                        
+                        #inizialize pipeline as list 
                         pipeline=[]    
                         #feature selection
                         if  estimator in models_with_fs:
                             pipeline.append(('feature_selection', estimator_feature))
                         
-                        #uso un modello specifico
+                        #add specific model to pipeline 
                         pipeline.append(('regressor', models_dict[estimator][0]))
+                        
+                        #pipe object with information from pipiline list 
                         pipe=Pipeline(pipeline)
                         
-                        #trasforma eventualmente la variabile y
+                        #useful for applying a non-linear transformation to the target y 
                         treg=TransformedTargetRegressor(regressor=pipe,transformer=None) 
                         
                         optEstimator = GridSearchCV(treg, models_dict[estimator][1],
@@ -216,6 +222,7 @@ for bar_radius in list_Bar_radius:
                                                     )
                                                     
                         _= optEstimator.fit(X_train2, y_train)
+                        #save list of different statistic evaluation metric for each model tested 
                         DATA_dict[estimator]["EOKfold"].append(np.abs(optEstimator.best_score_))
                         DATA_dict[estimator]["mae_train"].append(mean_absolute_error(optEstimator.predict(X_train2), y_train))
                         DATA_dict[estimator]["mae_test"].append(mean_absolute_error(optEstimator.predict(X_test2), y_test))
@@ -240,12 +247,14 @@ for bar_radius in list_Bar_radius:
                 df_proteins.insert(loc =1,
                           column = 'Em',
                           value = df_pm["Em"].values) 
-            #df_proteins.to_csv(path_dir_output+name_output_proteins+".csv")
+            
+            df_proteins.to_csv(path_dir_output+name_output_proteins+".csv") #save the file with the model error for each entries of the specific dataset 
             model_line=0
                 
+            #model tested out of nested cross validation 
             for estimator in name_models:
                 X2=X.copy()
-                #ph
+                #pH
                 fillph=imp.fit(X2)
                 X2=fillph.transform(X2)
                 #remove correlated feature
@@ -263,7 +272,7 @@ for bar_radius in list_Bar_radius:
                 pipeline.append(('regressor', models_dict[estimator][0]))
                 pipe=Pipeline(pipeline)
                 
-                #trasforma eventualmente la variabile y
+                #useful for applying a non-linear transformation to the target y 
                 treg=TransformedTargetRegressor(regressor=pipe,transformer=None) 
                 
                 optEstimator = GridSearchCV(treg, models_dict[estimator][1],

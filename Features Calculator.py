@@ -12,15 +12,14 @@ from PyBioMed.PyProtein import CTD
 import numpy as np
 import pandas as pd
 from utils import get_baricentro,get_atoms_coord,get_covariance,inizializza_dict_amm,feature_conteggio,specific_feature
-#%% parametri di lancio
-
-list_Bar=list(np.arange(8,17))          #distanza rispetto al baricentro dell'anello isocoso
-list_Ring=list(np.arange(3,7))          #distanza rispetto ad uno qualunche degli atomi dell'anello isocoso
+#%% 
+list_Bar=list(np.arange(8,17))          #set range for sampling r1
+list_Ring=list(np.arange(3,7))          #set range for sampling r2 
   
 amm_names=["ALA","ARG","ASN","ASP","CYS",
           "GLN","GLU","GLY","HIS","ILE",
           "LEU","LYS","MET","PHE","PRO",
-          "SER","THR","TRP","TYR","VAL"]  #amminoacids
+          "SER","THR","TRP","TYR","VAL"]  #amino acids
           
 # You can use a dict to convert three letter code to one letter code
 d3to1 = {'CYS': 'C', 'ASP': 'D', 'SER': 'S', 'GLN': 'Q', 'LYS': 'K',
@@ -29,27 +28,28 @@ d3to1 = {'CYS': 'C', 'ASP': 'D', 'SER': 'S', 'GLN': 'Q', 'LYS': 'K',
 'ALA': 'A', 'VAL':'V', 'GLU': 'E', 'TYR': 'Y', 'MET': 'M'}
 
 path_dir=""
-#%% leggo il file dove sono presente le proteine da considerare
+#%% 
+#read file 
 dataset=pd.read_excel(path_dir+"data/dataset.xlsx",usecols=(0,3,4))
 proteins_PDB=list(OrderedDict.fromkeys(dataset["PDB ID"])) #list of PDB ID used
-
+#read file with amino acids features
 table_amm=pd.read_csv(path_dir+"data/tableAmm.txt",
-                      sep="\t",index_col=1)#,header=None)#.reset_index()
+                      sep="\t",index_col=1)
 table_amm.index=[el.upper() for el in table_amm.index]
 table_amm=table_amm.iloc[:,1:]
 
-#%%ciclo for per considerare i diversi raggi rispetto a baricentro ed ring
+#%% start "for cycle" to consider different combination of radii
 for bar in list_Bar: 
     for ring in list_Ring:
         print ("__________________"+str(bar)+"and"+str(ring)+"__________________")
         
-#%% inizializzo il dataframe ed i nomi delle colonne: nome proteina+nome catena
-        df_total=pd.DataFrame()  
-        nomi=list()
-#%% accesso al database
+#%% 
+        df_total=pd.DataFrame()  #initialize pandas dataframe to save results 
+        names=list()              #initialize list to save name for dataframe columns
+#%% access to pdb database 
         pdbl = PDBList() 
 
-#%%ciclo for sulle varie proteine
+#%% "for cycle" on each protein  
 
         for name_protein in proteins_PDB:
             
@@ -59,16 +59,16 @@ for bar in list_Bar:
             structure = parser.get_structure(path_dir+name_protein,path_dir+"pdb"+name_protein+".ent") 
             
             # generation dict 
-            dict_residues=dict()  #dizionario dei residui
-            Cof_coord=dict()      #coordinate del baricentro dell'anello del cofattore
-            Cof_coords=dict()     #coordinate di tutti gli atomi dell'anello del cofattore   
-            N1_coord=dict()       #coordinate di N1 del cofattore
-            N3_coord=dict()       #coordinate di N3 del cofattore
-            N5_coord=dict()       #coordinate di N5 del cofattore
+            dict_residues=dict()  #inizialize dict for residues
+            Cof_coord=dict()      #inizialize dict for barycenter coordinate
+            Cof_coords=dict()     #inizialize dict for coordinate for each atom of the isoalloxazine ring 
+            N1_coord=dict()       #inizialize dict N1 coordinate  
+            N3_coord=dict()       #inizialize dict N3 coordinate  
+            N5_coord=dict()       #inizialize dict N5 coordinate 
             
-            #% start for cicle      
+            #% start for cycle      
             for model in structure:
-                #header
+                #header of the pdb file 
                 header=structure.header        
                 chains=model.get_chains()
                 
@@ -82,7 +82,7 @@ for bar in list_Bar:
                         print("non c'è ne un FAD ne un FMN!")
                         continue
                     else:
-                        nomi.append(name_protein+"chain_"+chain.id)
+                        names.append(name_protein+"chain_"+chain.id)
 
                     dict_residues[chain.id]=dict()
                     
@@ -112,15 +112,13 @@ for bar in list_Bar:
                                 ind1=23
                                 ind2=40
             
-                            #calculate barycenter
+                            #calculate barycenter coordinate 
                             Cof_coord_el=get_baricentro(residue,ind1,ind2)
-                            #calculate ring's atoms
-                            Cof_coords_el=get_atoms_coord(residue,ind1,ind2) 
-                            #calcolo gli autovalori del whim
-                            eigS=get_covariance(residue,ind1,ind2)
+                            #calculate ring's atoms coordinate
+                            Cof_coords_el=get_atoms_coord(residue,ind1,ind2)
                             
         
-                    #calcolo le feature sul conteggio
+                    #features about amino acids count 
                     dict_cont=inizializza_dict_amm(amm_names)
         
                     dict_cont,N5_nearest_res,N5_3_nearest_res=feature_conteggio(dict_cont,
@@ -133,12 +131,12 @@ for bar in list_Bar:
                               dict_residues,
                               amm_names)
                   
-                    #calcolo gli amminoacidi totali
-                    total_bar=sum([dict_cont["Bar."+nome] for nome in amm_names])
-                    total_protein=sum([dict_cont["Protein."+nome] for nome in amm_names])
-                    total_ring=sum([dict_cont["Ring."+nome] for nome in amm_names])
+                    #count number of total amino acids 
+                    total_bar=sum([dict_cont["Bar."+nome] for nome in amm_names]) #respect the r1 sphere 
+                    total_protein=sum([dict_cont["Protein."+nome] for nome in amm_names]) #respect the entire aa sequence
+                    total_ring=sum([dict_cont["Ring."+nome] for nome in amm_names]) #respect the r2 sphere 
         
-                    #queste righe sono solo per non dividere per zero dopo
+                    #rows to avoid any null divisions later  
                     if total_bar==0:
                         total_bar=1   
                     if total_protein==0:
@@ -146,79 +144,79 @@ for bar in list_Bar:
                     if total_ring==0:
                         total_ring=1 
                     
-                    #calcolo i descrittori Pone per l'intorno dell'anello (rispetto al baricentro)
+                    #r1 features calculation
                     for col in table_amm.columns: #28+28
                         values=table_amm[col]
                         val_feature=np.sum([values[nome]*dict_cont["Bar."+nome] for nome in amm_names])
                         dict_cont["Bar."+col]=val_feature
                         
             
-                    #calcolo i descrittori per tutta la proteina
+                    #protein features calculation
                     for col in table_amm.columns: 
                         values=table_amm[col]
                         val_feature=sum([values[nome]*dict_cont["Protein."+nome] for nome in amm_names])
                         dict_cont["Protein."+col]=val_feature
                                
                     
-                    #calcolo i descrittori Pone per l'intorno dell'anello ( rispetto a un atomo qualunque)
+                    #r2 features calculation
                     for col in table_amm.columns: 
                         values=table_amm[col]
                         val_feature=np.sum([values[nome]*dict_cont["Ring."+nome] for nome in amm_names])
                         dict_cont["Ring."+col]=val_feature
                                    
                         
-                    #calcolo descrittori dell'amminoacido davanti a N5
+                    #nearest amino acid respect N5
                     if N5_nearest_res:
                         for col in table_amm.columns: #28
                             value=table_amm.loc[N5_nearest_res,col]
                             dict_cont["N5_nearest."+col]=value
                     
-                    #calcolo descrittori dei 3 amminoacidi più vicini a N5
+                    #3 nearest amino acid respect N5
                     if N5_3_nearest_res:
                         for col in table_amm.columns: #28
                             value=table_amm.loc[N5_3_nearest_res,col].sum()
                             dict_cont["Around_N5."+col]=value        
                     
-                    #altre feature  #alifatici, aromatici, etc...
+                    #add some specific feature 
                     dict_cont=specific_feature(dict_cont,prefisso="Bar.",mean=True,total=total_bar)
                     dict_cont=specific_feature(dict_cont,prefisso="Protein.",mean=True,total=total_protein)
                     dict_cont=specific_feature(dict_cont,prefisso="Ring.",mean=True,total=total_bar)    
                     
                     dict_cont["PDB ID"]=name_protein
                     
-                    #aggiungo qualche info di header
+                    #add some information from the pdb file header 
                     dict_cont["organism"]=header["source"]["1"]["organism_scientific"]
                     
-                    #features da PyBioMed
+                    #features by PyBioMed
                     lista_fasta=""
                     for residue_name in residue_names:
                         if residue_name in d3to1.keys():
                             lista_fasta=lista_fasta+d3to1[residue_name]
                     protein_descriptor = CTD.CalculateC(lista_fasta)
                     
-                    #esegue il merge di due dizionari che in questo caso sono quello relativo alle features da codice e le features di PyBioMed
+                    #dicts merge between "aa count features" and "PyBioMed features"
                     dict_cont={**dict_cont,**protein_descriptor}
           
-                    ###fine calcolo features!!!
+                    ###end features calculation !!
                     df=pd.DataFrame.from_dict(dict_cont, orient ='index')
                     
-                    #aggiorno il df totale!!!
+                    #df_total update !!
                     df_total=pd.concat([df_total,df],axis=1)
         
             
-    #%% fine ciclo for su tutte le proteine considerate
+    #%% end of for cycle on proteins list 
         df_total=df_total.fillna(0)
-        #aggiorno i nomi delle colonne
-        df_total.columns=nomi
+        #columns name update 
+        df_total.columns=names
         df_total=df_total.transpose()
         
         cols = df_total.columns.tolist()
         df_total = df_total[cols]
         print(bar,ring)
         
-        df_total=df_total.groupby("PDB ID").agg(lambda x: np.round(np.mean(x),2))
+        df_total=df_total.groupby("PDB ID").agg(lambda x: np.round(np.mean(x),2)) #groupby for PDB ID if a protein has 2+ chains
         
-        dataset2=dataset.join(df_total, on="PDB ID")        
-        dataset2.to_excel(path_dir+"dataset_features/dataset_protein_"+str(bar)+"_"+str(ring)+".xlsx")    
+        dataset2=dataset.join(df_total, on="PDB ID") #join pandas function to add information about Em and pH to the features dataset        
+        dataset2.to_excel(path_dir+"dataset_features/dataset_protein_"+str(bar)+"_"+str(ring)+".xlsx") #save final dataset    
         
 

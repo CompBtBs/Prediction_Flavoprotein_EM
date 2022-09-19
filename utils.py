@@ -41,7 +41,7 @@ class RHCF():
         return X_[:,self.to_keep]
 
 
-#%% funzione per prelevare il baricentro di una struttura
+#%% function to calculate barycenter 
 def get_baricentro(element,el1,el2):
     if el2!=-1:
         atoms_coord=[el.coord for el in element.child_list[el1:el2]]
@@ -50,7 +50,7 @@ def get_baricentro(element,el1,el2):
 
     return np.mean(atoms_coord,axis=0)
 
-#%% funzione per prelevare tutti gli atomi di una molecola
+#%% function to get each atom from a molecule 
 def get_atoms_coord(element,el1,el2):
     if el2!=-1:
         atoms_coord=[el.coord for el in element.child_list[el1:el2]]
@@ -61,8 +61,8 @@ def get_atoms_coord(element,el1,el2):
 #%%
 def get_covariance(element,el1,el2):
 
-    atoms_coord_tot=[el.coord for el in element.child_list]  #coordinate dei vari atomi
-    baricenter_tot=np.mean(atoms_coord_tot,axis=0)           #baricentro del cofattore
+    atoms_coord_tot=[el.coord for el in element.child_list]  #ring's atoms coordinate
+    baricenter_tot=np.mean(atoms_coord_tot,axis=0)           #isoalloxazine ring barycenter 
     
     weight_total=0
     Sxx=0
@@ -99,7 +99,7 @@ def get_covariance(element,el1,el2):
     eigS,matrix=np.linalg.eig(S)
 
     return eigS
-#%% inizializzo il dizionario dove salvo i conteggi degli amminoacidi
+#%% inizialize dict for amino acids count 
 def inizializza_dict_amm(nomi_amm):
     dict_cont=dict()
     for el in nomi_amm:
@@ -109,14 +109,14 @@ def inizializza_dict_amm(nomi_amm):
     return dict_cont
 
 #%%
-def specific_feature(dict_cont,prefisso="",mean=True,total=None):
+def specific_feature(dict_cont,prefix ="",mean=True,total=None):
     """
-    Funzione per il calcolo di specifiche feature:
+    Function for specific features calculation:
 
-    Gli input sono:
-        dict_cont: il dizionario dove salvo le feature
-        prefisso: prefisso da aggiungere al nome della feature (molto comodo)
-        mean: se mean è vero calcolo anche le feature in funzione di...
+    Inputs:
+        dict_cont: dict to save features 
+        prefix : prefix prefix to be added to the feature name 
+        mean: if mean is true, the features will be calculated in function of...
     """
 
     apolari=["ALA","PHE","GLY","ILE","LEU","MET","PRO","TRP","VAL"]
@@ -125,25 +125,25 @@ def specific_feature(dict_cont,prefisso="",mean=True,total=None):
 
   
     
-    if prefisso!="":
-        apolari=[prefisso+el for el in apolari]
-        polari=[prefisso+el for el in polari]
-        aromatici=[prefisso+el for el in aromatici]
+    if prefix !="":
+        apolari=[prefix + el for el in apolari]
+        polari=[prefix + el for el in polari]
+        aromatici=[prefix + el for el in aromatici]
         
-    #altre feature
-    dict_cont[prefisso+"NumAMM"]=total
-    dict_cont[prefisso+"RESNEG"]=dict_cont[prefisso+"GLU"]+dict_cont[prefisso+"ASP"]
-    dict_cont[prefisso+"RESPOS"]=dict_cont[prefisso+"ARG"]+dict_cont[prefisso+"LYS"]
-    dict_cont[prefisso+"FormalCharge"]=dict_cont[prefisso+"RESPOS"]-dict_cont[prefisso+"RESNEG"]
+    #other specific features
+    dict_cont[prefix + "NumAMM"]=total
+    dict_cont[prefix + "RESNEG"]=dict_cont[prefix +"GLU"]+dict_cont[prefix +"ASP"]
+    dict_cont[prefix + "RESPOS"]=dict_cont[prefix +"ARG"]+dict_cont[prefix +"LYS"]
+    dict_cont[prefix + "FormalCharge"]=dict_cont[prefix +"RESPOS"]-dict_cont[prefix +"RESNEG"]
 
     ###
-    dict_cont[prefisso+"ResApolari"]=np.sum([dict_cont[el] for el in apolari])
-    dict_cont[prefisso+"ResPolari"]=np.sum([dict_cont[el] for el in polari])
-    dict_cont[prefisso+"ResAromatici"]=np.sum([dict_cont[el] for el in aromatici])
+    dict_cont[prefix + "ResApolari"]=np.sum([dict_cont[el] for el in apolari])
+    dict_cont[prefix + "ResPolari"]=np.sum([dict_cont[el] for el in polari])
+    dict_cont[prefix + "ResAromatici"]=np.sum([dict_cont[el] for el in aromatici])
     
     
     return dict_cont
-#%% definisco alcune funzione utili
+#%% 
 def feature_conteggio(dict_cont,
                       chain,
                       Cof_coord_el,
@@ -154,50 +154,50 @@ def feature_conteggio(dict_cont,
                       dict_residues,
                       nomi_amm):
     """
-    Funzione che conta gli amminoacidi:
-        1. in tutta la catena
-        2. in un intorno dell'anello isocoso (rispetto al suo baricentro')
-        3. in un intorno dell'anello isocoso (rispetto a qualunque suo atomo'
-    Gli input sono:
-        dict_cont: il dizionario dove salvo le feature
-        chain: la catena che considero
-        Cof_coord_el: coordinate del baricentro dell'anello isocoso
-        Cof_coords_el: coordinate degli atomi dell'anello isocoso
-        N5_el: coordinate di N5 dell'anello isocoso
-        min_distBarycenter: distanza minima dal baricentro
-        min_distRing: distanza minima da un qualunque atomo dell'anello isocoso
-        dict_residues: dizionario dei residui (identificativo e nome)
-        nomi_amm: lista degli amminoacidi
+    Amino acid count function:
+        1. respect the entire aa sequence
+        2. respect r1 sphere (barycenter)
+        3. respect r2 sphere 
+    Inputs:
+        dict_cont: dict to save the features
+        chain: chain considered 
+        Cof_coord_el: barycenter coordinate 
+        Cof_coords_el: coordinate for each atom of the isoalloxazine ring 
+        N5_el: N5 coordinate
+        min_distBarycenter: min distance respect to the barycenter 
+        min_distRing: min distance respect to any atom of the isoalloxazine ring  
+        dict_residues: dict for residue information (id and name)
+        nomi_amm: amino acid list 
     """
-    min_dist_amm=1000000 #valore di defau
+    min_dist_amm=1000000 #default value
     chain_amms=[el for el in chain.get_residues() if el.resname in nomi_amm]
     lenChain=len(chain_amms)-1
     
-    #imposto le voci dei contatori di Oxigen, Nitrogen e Carbon
+    #count for Oxigen, Nitrogen and Carbon respect the r2 sphere 
     dict_cont["Oxigen_around"]=0
     dict_cont["Nitrogen_around"]=0
     dict_cont["Carbon_around"]=0
     
-    #inizializzo a zero o None in modo che se certi valori non vengono calcoli, cmq il codice gira
+    #inizialize variable as 0 or None to avoid code interruption
     k=0
     min_id_amms=None
     N5_nearest_res=None
     
-    #%ciclo for su tutti gli amminoacidi
+    #%for cycle on the amino acids
     for residue in chain_amms:
         name_residue=residue.resname
         atoms=[atom for atom in residue.get_atoms()]
 
-        #faccio il conteggio dei vari amminoacidi della proteina
+        #count for protein amino acids
         dict_cont["Protein."+name_residue]+=1
 
-        #se l'atomo di un amminoacido è vicino al baricentro allora lo conteggio
+        #get atoms present in the r1 sphere 
         for atom in atoms:
             if norm2(atom.coord-Cof_coord_el)<min_distBarycenter:
-                dict_cont["Bar."+name_residue]+=1 #basta solo che un atomo dell'amminoacido sia vicino!!!!
-                break
+                dict_cont["Bar."+name_residue]+=1 
+                break # it's sufficient that just one of the amino acid atoms is in the sphere to add the aa to the dict
 
-        #### verifico se un amminoacidi ha almeno un atomo vicino a un qualunque atomo dell'anello
+        #### get atoms present in the r2 sphere 
         stop_cont=0
         for atom in atoms:
             for el2 in Cof_coords_el:
@@ -212,7 +212,7 @@ def feature_conteggio(dict_cont,
         for atom in atoms:
             for el2 in Cof_coords_el:
                 if norm2(atom.coord-el2)<min_distRing:
-                    #controllo se l'atomo è vicino a qualcosa e di che tipo di atomo si tratta 
+                    #check if the one of the sphere2 isoloxazine ring atom is near O,N or C atom 
                     if atom.element=="O":
                         dict_cont["Oxigen_around"]+=1                
                     if atom.element=="N":
@@ -221,7 +221,7 @@ def feature_conteggio(dict_cont,
                         dict_cont["Carbon_around"]+=1
                     break
                         
-        #trovo l'amminoacido più vicino a N5
+        #get nearest atom to N5 and get the related residue 
         for atom in atoms:
             distanza=norm2(atom.coord-N5_el)
             if distanza<min_dist_amm:
@@ -246,7 +246,7 @@ def feature_conteggio(dict_cont,
     else:
         N5_3_nearest_res=None
          
-    #stampo quali sono gli amminoacidi davanti a N5
+    #print the 3 amino acid nearest N5
     print("Name of 3 amminoacids nearest to N5: ",N5_3_nearest_res)
 
     return dict_cont,N5_nearest_res,N5_3_nearest_res
