@@ -21,7 +21,7 @@ scan_file="results_dataset.xlsx"
 df_scan=pd.read_excel(path_dir1+ scan_file)
 
 #choose the statistical metric to use 
-stat_metr= "R2" # or R2 
+stat_metr= "MAE" # or R2 
 
 if "Unnamed: 0" in df_scan.columns:
     df_scan=df_scan.drop("Unnamed: 0",axis=1)
