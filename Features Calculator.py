@@ -30,8 +30,8 @@ d3to1 = {'CYS': 'C', 'ASP': 'D', 'SER': 'S', 'GLN': 'Q', 'LYS': 'K',
 path_dir=""
 #%% 
 #read file 
-dataset=pd.read_excel(path_dir+"data/dataset.xlsx",usecols=(0,3,4))
-proteins_PDB=list(OrderedDict.fromkeys(dataset["PDB ID"])) #list of PDB ID used
+dataset=pd.read_excel(path_dir+"data/dataset.xlsx",usecols=(1,8,9))
+proteins_PDB=list(OrderedDict.fromkeys(dataset["PDB"])) #list of PDB ID used
 #read file with amino acids features
 table_amm=pd.read_csv(path_dir+"data/tableAmm.txt",
                       sep="\t",index_col=1)
