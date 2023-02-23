@@ -57,7 +57,7 @@ max_iter=1000                   #hyperparameter for ElasticNet method
 
 ###############################################################################################
 #%%
-df_data=pd.read_excel("data/dataset.xlsx",index_col=1)
+df_data=pd.read_excel("data/dataset.xlsx",index_col=0)
 proteins=list(df_data.index) #list of PDB ID to be considered  
 
 #inizialize pd.dataframe which will be used to save results row by row  
