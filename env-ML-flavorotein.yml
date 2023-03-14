@@ -1,0 +1,20 @@
+name: ML-env
+channels:
+  - conda-forge
+dependencies:
+  - h5py
+  - matplotlib
+  - pip
+  - tqdm
+  - pandas
+  - numpy
+  - scikit-learn
+  - scipy
+  - xgboost
+  - seaborn
+  - biopython
+  
+  # Dev tools
+  - flake8
+  - pytest
+  - psutil
