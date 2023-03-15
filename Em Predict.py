@@ -35,7 +35,7 @@ models_with_scaling = [
     "SVR",
 ]  # list of models with features scaling (StandardScaler)
 models_with_fs = ["LR", "GPR", "KNR", "SVR"]  # list of models with features selection
-selected_features = []  # eventually subset of features to use
+features_list = []  # eventually subset of features to use
 
 n_jobs = 4  # number of processes in parallel
 path_inputs = "dataset_features/"
@@ -124,8 +124,8 @@ for bar_radius in list_Bar_radius:
                 dict_proteins[estimator][f"{key}_{str(cont)}"] = 0
                 cont += 1
 
-        if len(selected_features) != 0:
-            df_pm = df_pm.loc[:, selected_features]
+        if len(features_list) != 0:
+            df_pm = df_pm.loc[:, features_list]
 
         # Input/output
         X = df_pm.iloc[:, 1:].values  # all values except Em
